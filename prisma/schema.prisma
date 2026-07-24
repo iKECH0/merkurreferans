@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String       @id @default(cuid())
+  name               String?
+  username           String       @unique
+  password           String
+  phone              String?      @unique
+  role               String       @default("STUDENT") // "ADMIN", "LEADER_TEACHER", "TEACHER", "PARENT", "STUDENT"
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  subscriptionEnd    DateTime?
+  requestedMonths    Int          @default(1)
+  
+  // Referral System
+  referralCode       String?      @unique
+  referrerId         String?
+  ibanDetails        String?      @db.Text
+  referrer           User?        @relation("ReferralTree", fields: [referrerId], references: [id])
+  referrals          User[]       @relation("ReferralTree")
+  commissionsEarned  Commission[] @relation("CommissionsEarned")
+  commissionsSourced Commission[] @relation("CommissionsSourced")
+  
+  wallet             Wallet?
+  lessonsGiven       Lesson[]     @relation("TeacherLessons")
+  lessonsTaken       Lesson[]     @relation("StudentLessons")
+}
+
+model Wallet {
+  id             String              @id @default(cuid())
+  userId         String              @unique
+  balance        Float               @default(0.0) // Çekilebilir bakiye
+  pendingBalance Float               @default(0.0) // Bekleyen bakiye (Ders bitince aktarılır)
+  updatedAt      DateTime            @updatedAt
+  
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  amount      Float
+  type        String   // "EARNED", "PENDING", "WITHDRAWN", "SPENT"
+  description String?
+  createdAt   DateTime @default(now())
+  
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
+model Lesson {
+  id            String   @id @default(cuid())
+  title         String
+  teacherId     String
+  studentId     String
+  zoomLink      String?
+  zoomStartLink String?  @db.Text
+  zoomMeetingId String?
+  startTime     DateTime
+  endTime       DateTime
+  status        String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  price         Float    @default(0.0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  teacher       User         @relation("TeacherLessons", fields: [teacherId], references: [id])
+  student       User         @relation("StudentLessons", fields: [studentId], references: [id])
+  commissions   Commission[]
+}
+
+model Settings {
+  id                  String   @id @default("GLOBAL")
+  institutionName     String   @default("Merkür Eğitim Ders Platformu")
+  logoUrl             String?  
+  announcement        String?  
+  commissionRate      Float    @default(15.0) 
+  lessonTeacherShareA Float    @default(50.0) 
+  lessonTeacherShareB Float    @default(65.0) 
+  leaderTeacherShare  Float    @default(10.0) 
+  parentReferralBonus Float    @default(15.0) 
+  updatedAt           DateTime @updatedAt
+}
+
+model Commission {
+  id            String   @id @default(cuid())
+  userId        String   // Bayi (Referrer) ID
+  sourceUserId  String   // Ödemeyi yapan öğrencinin ID
+  lessonId      String?  
+  amount        Float    // Komisyon Miktarı
+  status        String   @default("PENDING") // PENDING, PAID
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation("CommissionsEarned", fields: [userId], references: [id], onDelete: Cascade)
+  sourceUser    User     @relation("CommissionsSourced", fields: [sourceUserId], references: [id], onDelete: Cascade)
+  lesson        Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+}
