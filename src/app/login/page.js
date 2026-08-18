@@ -48,10 +48,31 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#020617', position: 'relative', overflow: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes floatGlow {
+          0%, 100% { transform: translateY(0) scale(1); opacity: 0.05; }
+          50% { transform: translateY(-20px) scale(1.1); opacity: 0.1; }
+        }
+        @keyframes portalPulse {
+          0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
+          70% { box-shadow: 0 0 0 15px rgba(56, 189, 248, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        }
+        @keyframes teacherPulse {
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+          70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .student-portal-btn:hover .portal-icon {
+          animation: portalPulse 1.5s infinite;
+        }
+        .teacher-portal-btn:hover .portal-icon {
+          animation: teacherPulse 1.5s infinite;
+        }
+      `}} />
       {/* Subtle Background Glows */}
-      <div style={{ position: 'absolute', top: '20%', left: '10%', width: '300px', height: '300px', background: 'rgba(56, 189, 248, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none' }}></div>
-      <div style={{ position: 'absolute', bottom: '20%', right: '10%', width: '300px', height: '300px', background: 'rgba(16, 185, 129, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none' }}></div>
+      <div style={{ position: 'absolute', top: '10%', left: '10%', width: '300px', height: '300px', background: 'rgba(56, 189, 248, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none', animation: 'floatGlow 8s ease-in-out infinite' }}></div>
+      <div style={{ position: 'absolute', bottom: '10%', right: '10%', width: '300px', height: '300px', background: 'rgba(16, 185, 129, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none', animation: 'floatGlow 8s ease-in-out infinite reverse' }}></div>
 
       <div style={{ zIndex: 1, width: '100%', maxWidth: '500px', padding: '2rem' }}>
         
@@ -73,13 +94,14 @@ export default function LoginPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             {/* Student Portal Button */}
             <button 
+              className="student-portal-btn"
               onClick={() => setSelectedPortal('student')}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '24px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'left' }}
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)'; e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(56, 189, 248, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                <div className="portal-icon" style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(56, 189, 248, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
                   <GraduationCap size={28} />
                 </div>
                 <div>
@@ -92,13 +114,14 @@ export default function LoginPage() {
 
             {/* Teacher/Referrer Portal Button */}
             <button 
+              className="teacher-portal-btn"
               onClick={() => setSelectedPortal('teacher')}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '24px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'left' }}
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'translateY(0)'; }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+                <div className="portal-icon" style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
                   <Presentation size={28} />
                 </div>
                 <div>
