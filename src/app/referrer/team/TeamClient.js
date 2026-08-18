@@ -128,7 +128,7 @@ export default function TeamClient({ initialTeam, allUsersForTree, currentUserId
         <div style={{ maxWidth: '500px' }}>
           <h3>Alt Referans Hesabı Oluştur</h3>
           <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-            Buradan oluşturacağınız referanslar, doğrudan size (sponsor olarak) bağlanır. Onların verdiği derslerden, yönetim tarafından belirlenen pasif gelirleri kazanırsınız.
+            Buradan oluşturacağınız referanslar, doğrudan size (Lider Referans olarak) bağlanır. Onların verdiği derslerden, yönetim tarafından belirlenen pasif gelirleri kazanırsınız.
           </p>
           <form onSubmit={handleAddTeacher} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="form-group">

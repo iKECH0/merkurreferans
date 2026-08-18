@@ -90,9 +90,9 @@ export default function SettingsClient({ currentSettings }) {
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>Lider Öğretmen (Sponsor) Pasif Payı (%)</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>Lider Öğretmen Pasif Payı (%)</label>
             <input type="number" name="leaderTeacherShare" defaultValue={currentSettings?.leaderTeacherShare || 10.0} className="input-field" step="0.1" required />
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Referansi sisteme katan Lider Öğretmenin, o referansin verdiği derslerden alacağı pasif pay.</p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Referansı sisteme katan Lider Öğretmenin, o referansın verdiği derslerden alacağı pasif pay.</p>
           </div>
 
           <div>
@@ -170,7 +170,7 @@ export default function SettingsClient({ currentSettings }) {
             Sistemdeki tüm öğrenci kayıtlarını, şifreleri ve skorları bilgisayarınıza indirip güvenle saklayabilirsiniz.
           </p>
           <a href="/api/backup" download className="btn-primary" style={{ display: 'inline-block', textDecoration: 'none', background: '#10b981', color: 'white', padding: '0.8rem 1.5rem', borderRadius: '6px', fontWeight: 'bold' }}>
-            x Tüm Verileri İndir (.json)
+            ⬇️ Tüm Verileri İndir (.json)
           </a>
         </div>
       </div>

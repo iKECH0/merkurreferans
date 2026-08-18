@@ -154,7 +154,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                 <th>Referans Adı</th>
                 <th>Kullanıcı Adı</th>
                 <th>Referans Kodu</th>
-                <th>x  Öğrenci Sayısı</th>
+                <th>👤 Öğrenci Sayısı</th>
                 <th>Toplam Kazanç</th>
                 <th>Banka / IBAN</th>
                 <th>Ağ Detayı</th>
@@ -301,7 +301,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{comm.lesson.title}</div>
                       </div>
                     ) : (
-                      <span style={{ color: '#60a5fa', fontSize: '0.9rem' }}>x Paket / Abonelik Kaydı</span>
+                      <span style={{ color: '#60a5fa', fontSize: '0.9rem' }}>📦 Paket / Abonelik Kaydı</span>
                     )}
                   </td>
                   <td style={{ color: '#10b981', fontWeight: 'bold' }}>₺{comm.amount.toFixed(2)}</td>
@@ -347,7 +347,11 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                   <td style={{ fontWeight: 'bold' }}>{wallet.user.name || wallet.user.username}</td>
                   <td>
                     <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                      {wallet.user.role}
+                      {wallet.user.role === 'LEADER_TEACHER' ? '🚀 Lider Öğretmen'
+                        : wallet.user.role === 'TEACHER' ? '👨‍🏫 Öğretmen'
+                        : wallet.user.role === 'PARENT' ? '🏠 Veli / Bayi'
+                        : wallet.user.role === 'STUDENT' ? '🎓 Öğrenci'
+                        : wallet.user.role}
                     </span>
                   </td>
                   <td style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem' }}>₺{wallet.balance.toFixed(2)}</td>
@@ -363,7 +367,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                       disabled={isPending || wallet.balance <= 0}
                       style={{ padding: '0.5rem 1rem', borderRadius: '4px', border: 'none', background: '#10b981', color: 'white', cursor: 'pointer', opacity: isPending ? 0.5 : 1, fontWeight: 'bold' }}
                     >
-                      x Bakiyeyi Öde (Sıfırla)
+                      ✅ Bakiyeyi Öde (Sıfırla)
                     </button>
                   </td>
                 </tr>
@@ -410,9 +414,9 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
               </select>
             </div>
             <div className="form-group">
-              <label>Bağlı Olduğu Sponsor / Lider (Opsiyonel)</label>
+              <label>Bağlı Olduğu Lider / Üst Referans (Opsiyonel)</label>
               <select className="input-field" value={referrerId} onChange={e => setReferrerId(e.target.value)}>
-                <option value="">-- Bağımsız (Sponsoru Yok) --</option>
+                <option value="">-- Bağımsız (Üst Referansı Yok) --</option>
                 {initialReferrers.map(ref => (
                   <option key={ref.id} value={ref.id}>{ref.name} ({ref.role})</option>
                 ))}
