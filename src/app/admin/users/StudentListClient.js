@@ -5,6 +5,7 @@ import ResetPasswordClient from "./ResetPasswordClient";
 import { deleteStudent, approveStudent } from "./actions";
 import toast from 'react-hot-toast';
 import { customConfirm } from "@/lib/toastHelpers";
+import { getUserLevel } from "@/lib/userLevels";
 
 export default function StudentListClient({ initialStudents }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -78,10 +79,25 @@ export default function StudentListClient({ initialStudents }) {
             <tbody>
               {filteredStudents.map((student) => {
                 const isExpired = student.subscriptionEnd && new Date(student.subscriptionEnd) < new Date();
+                const levelInfo = getUserLevel(student.role, student._count?.referrals || 0);
                 
                 return (
                   <tr key={student.id}>
-                    <td>{student.name}</td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <span style={{ fontWeight: 'bold' }}>{student.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: `${levelInfo.color}15`, borderRadius: '8px', border: `1px solid ${levelInfo.color}40`, color: levelInfo.color, whiteSpace: 'nowrap' }}>
+                            {levelInfo.icon} {levelInfo.title}
+                          </span>
+                          {student.referrer && (
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', background: 'rgba(255,255,255,0.03)', padding: '0.15rem 0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap' }}>
+                              Rehber: {student.referrer.name || student.referrer.username}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
                     <td>{student.username}</td>
                     <td>
                       {student.isActive 

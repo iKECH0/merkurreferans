@@ -84,7 +84,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Öğrenci Portalı</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Çalışmalarınızı kaydedin, hedeflerinizi takip edin.</p>
+                  <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Canlı derslerinize katılın ve gelişiminizi takip edin.</p>
                 </div>
               </div>
               <ChevronRight color="#64748b" />
@@ -102,8 +102,8 @@ export default function LoginPage() {
                   <Presentation size={28} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Öğretmen Portalı</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Öğrencilerinizi yönetin ve analiz raporları alın.</p>
+                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Bayi / Eğitmen Portalı</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Ağınızı yönetin, ders verin ve komisyonlarınızı izleyin.</p>
                 </div>
               </div>
               <ChevronRight color="#64748b" />

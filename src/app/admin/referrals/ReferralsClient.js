@@ -3,6 +3,7 @@ import React, { useState, useTransition } from "react";
 import { addReferrer, deleteReferrer, withdrawWalletBalance, updateReferrerIban } from "./actions";
 import toast from 'react-hot-toast';
 import { customConfirm, customPrompt } from "@/lib/toastHelpers";
+import { getUserLevel } from "@/lib/userLevels";
 
 export default function ReferralsClient({ initialReferrers, initialWallets, initialCommissions }) {
   const [isPending, startTransition] = useTransition();
@@ -164,11 +165,20 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
               {sortedReferrers.map((referrer, index) => {
                 const totalEarned = referrer.commissionsEarned.reduce((sum, c) => sum + c.amount, 0);
                 const isTop = index === 0 && referrer.referrals.length > 0;
+                const levelInfo = getUserLevel(referrer.role, referrer.referrals.length);
+
                 return (
                   <React.Fragment key={referrer.id}>
                   <tr style={{ background: isTop ? 'rgba(251, 191, 36, 0.05)' : 'transparent' }}>
-                    <td style={{ fontWeight: isTop ? 'bold' : 'normal' }}>
-                      {isTop && "x "} {referrer.name}
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <span style={{ fontWeight: isTop ? 'bold' : 'normal' }}>
+                          {isTop && "⭐ "} {referrer.name}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: `${levelInfo.color}15`, borderRadius: '8px', border: `1px solid ${levelInfo.color}40`, color: levelInfo.color, whiteSpace: 'nowrap', width: 'fit-content' }}>
+                          {levelInfo.icon} {levelInfo.title}
+                        </span>
+                      </div>
                     </td>
                     <td>{referrer.username}</td>
                     <td style={{ fontWeight: 'bold', color: '#10b981' }}>{referrer.referralCode}</td>

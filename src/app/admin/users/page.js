@@ -6,6 +6,10 @@ import CsvImportClient from "./CsvImportClient";
 export default async function StudentsPage() {
   const students = await prisma.user.findMany({
     where: { role: { not: "ADMIN" } },
+    include: {
+      referrer: { select: { name: true, username: true } },
+      _count: { select: { referrals: true } }
+    },
     orderBy: { createdAt: "desc" }
   });
 
