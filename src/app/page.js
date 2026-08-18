@@ -26,7 +26,7 @@ export default function ReferansLandingPage() {
   const faqs = [
     {
       question: "Sisteme referans/eğitmen olarak kayıt olmak ücretli mi?",
-      answer: "Hayır, Merkür Odak platformuna eğitmen veya referans olarak katılmak tamamen ücretsizdir. Kurulum ücreti veya aylık aidat alınmaz."
+      answer: "Hayır, Merkür Referans platformuna eğitmen veya referans olarak katılmak tamamen ücretsizdir. Kurulum ücreti veya aylık aidat alınmaz."
     },
     {
       question: "Komisyonlar nasıl hesaplanıyor ve ödeniyor?",
@@ -48,7 +48,7 @@ export default function ReferansLandingPage() {
       {/* NAVBAR */}
       <nav className="landing-nav">
         <div className="landing-logo">
-          <span style={{ color: 'var(--primary)' }}>🪐 MERKÜR</span> ODAK
+          <span style={{ color: 'var(--primary)' }}>🪐 MERKÜR</span> REFERANS
         </div>
         <div className="landing-nav-buttons">
           <Link href="/login" className="btn-secondary" style={{ textDecoration: 'none' }}>Sisteme Giriş</Link>
@@ -216,7 +216,7 @@ export default function ReferansLandingPage() {
       {/* 7. CTA & FOOTER */}
       <section style={{ padding: '6rem 5% 3rem', textAlign: 'center', background: 'linear-gradient(to bottom, transparent, rgba(16, 185, 129, 0.05))' }}>
         <h2 style={{ fontSize: '3rem', color: '#fff', marginBottom: '1.5rem', fontWeight: '800' }}>Kendi ağınızı kurmaya hazır mısınız?</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', marginBottom: '3rem' }}>Hemen kayıt olun ve kazancınızı Merkür Odak güvencesiyle katlayın.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', marginBottom: '3rem' }}>Hemen kayıt olun ve kazancınızı Merkür Referans güvencesiyle katlayın.</p>
         
         <Link href="/register" className="btn-primary" style={{ padding: '1.2rem 3rem', fontSize: '1.2rem', textDecoration: 'none', background: '#10b981', color: '#fff', border: 'none', display: 'inline-block', marginBottom: '5rem' }}>
           Ücretsiz Kayıt Ol
@@ -225,7 +225,7 @@ export default function ReferansLandingPage() {
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '3rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto', gap: '2rem' }}>
           <div style={{ textAlign: 'left' }}>
             <div className="landing-logo" style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-              <span style={{ color: 'var(--primary)' }}>🪐 MERKÜR</span> ODAK
+              <span style={{ color: 'var(--primary)' }}>🪐 MERKÜR</span> REFERANS
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Eğitimin Yeni Referans Noktası &copy; 2026</p>
           </div>
