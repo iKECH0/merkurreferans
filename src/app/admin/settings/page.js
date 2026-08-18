@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import SettingsClient from "./SettingsClient";
 
 export const metadata = {
-  title: "Kurum Ayarları | MERKÜR ODAK Admin",
+  title: "Kurum Ayarları | MERKÜR REFERANS Admin",
+  description: "Kurum ayarları ve yapılandırma",
 };
 
 export default async function SettingsPage() {

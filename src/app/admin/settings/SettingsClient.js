@@ -38,7 +38,7 @@ export default function SettingsClient({ currentSettings }) {
           <input 
             type="text" 
             name="institutionName" 
-            defaultValue={currentSettings?.institutionName || "MERKÜR ODAK"} 
+            defaultValue={currentSettings?.institutionName || "MERKÜR REFERANS"} 
             className="input-field" 
             required 
             placeholder="Örn: X Akademi"

@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation';
 import TeamClient from './TeamClient';
 
 export const metadata = {
-  title: "Ekibim | MERKÜR ODAK",
+  title: "Ekibim | MERKÜR REFERANS",
+  description: "Alt referanslar ve ekip yönetimi",
 };
 
 export default async function ReferrerTeam() {

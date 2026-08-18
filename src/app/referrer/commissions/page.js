@@ -2,7 +2,8 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 
 export const metadata = {
-  title: "Kazançlarım | MERKÜR ODAK",
+  title: "Kazançlarım | MERKÜR REFERANS",
+  description: "Komisyon ve kazanç detayları",
 };
 
 export default async function ReferrerCommissions() {
