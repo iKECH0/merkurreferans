@@ -4,7 +4,7 @@ import ReferralsClient from "./ReferralsClient";
 export default async function ReferralsPage() {
   const referrers = await prisma.user.findMany({
     where: { 
-      role: { in: ["REFERRER", "LEADER_TEACHER", "TEACHER", "PARENT"] }
+      role: { in: ["LEADER_TEACHER", "TEACHER", "PARENT"] }
     },
     include: {
       referrals: true,
