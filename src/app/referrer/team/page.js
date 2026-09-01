@@ -11,14 +11,17 @@ export const metadata = {
 export default async function ReferrerTeam() {
   const session = await auth();
   
-  if (!session || session.user.role !== 'LEADER_TEACHER') {
-    redirect('/referrer'); // Sadece Lider Öğretmenler görebilir
+  if (!session || !['TEACHER', 'LEADER_TEACHER'].includes(session.user.role)) {
+    redirect('/referrer'); // Sadece Öğretmenler görebilir
   }
 
   const team = await prisma.user.findMany({
     where: { 
       referrerId: session.user.id,
       role: 'TEACHER'
+    },
+    include: {
+      _count: { select: { referrals: true } }
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -30,7 +33,8 @@ export default async function ReferrerTeam() {
       username: true,
       role: true,
       referrerId: true,
-      createdAt: true
+      createdAt: true,
+      _count: { select: { referrals: true } }
     }
   });
 

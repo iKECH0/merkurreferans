@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
-import { addStudentByReferrer } from "./actions";
+import { addStudentByReferrer, deleteStudentByReferrer } from "./actions";
 import toast from 'react-hot-toast';
+import { customConfirm } from "@/lib/toastHelpers";
 
 export default function StudentsClient({ students, currentUserId }) {
   const [activeTab, setActiveTab] = useState("LIST"); // LIST, EKLE
@@ -12,6 +13,20 @@ export default function StudentsClient({ students, currentUserId }) {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [requestedMonths, setRequestedMonths] = useState("1");
+
+  const handleDeleteStudent = async (id, studentName) => {
+    const confirmed = await customConfirm(`${studentName || 'Bu öğrenciyi'} silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`);
+    if (confirmed) {
+      startTransition(async () => {
+        const res = await deleteStudentByReferrer(id);
+        if (res?.error) {
+          toast.error(res.error);
+        } else {
+          toast.success("Öğrenci silindi.");
+        }
+      });
+    }
+  };
 
   const handleAddStudent = async (e) => {
     e.preventDefault();
@@ -71,10 +86,13 @@ export default function StudentsClient({ students, currentUserId }) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Ad Soyad</th>
+                    <th>Öğrenci Adı Soyadı</th>
+                    <th>Kullanıcı Adı</th>
+                    <th>Telefon</th>
                     <th>Kayıt Tarihi</th>
                     <th>Abonelik Bitiş</th>
                     <th>Durum</th>
+                    <th>İşlem</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -83,7 +101,9 @@ export default function StudentsClient({ students, currentUserId }) {
                     
                     return (
                       <tr key={student.id}>
-                        <td>{student.name}</td>
+                        <td style={{ fontWeight: 'bold' }}>{student.name || '-'}</td>
+                        <td>{student.username}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{student.phone || '-'}</td>
                         <td>{new Date(student.createdAt).toLocaleDateString('tr-TR')}</td>
                         <td>{student.subscriptionEnd ? new Date(student.subscriptionEnd).toLocaleDateString('tr-TR') : '-'}</td>
                         <td>
@@ -97,6 +117,16 @@ export default function StudentsClient({ students, currentUserId }) {
                           }}>
                             {!student.isActive ? 'Ödeme / Onay Bekliyor' : isExpired ? 'Süresi Doldu' : 'Aktif (Onaylandı)'}
                           </span>
+                        </td>
+                        <td>
+                          <button
+                            className="btn-sm btn-danger"
+                            onClick={() => handleDeleteStudent(student.id, student.name || student.username)}
+                            disabled={isPending}
+                            style={{ padding: '0.35rem 0.75rem', borderRadius: '4px', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', opacity: isPending ? 0.5 : 1, fontSize: '0.8rem' }}
+                          >
+                            Sil
+                          </button>
                         </td>
                       </tr>
                     );
@@ -116,19 +146,19 @@ export default function StudentsClient({ students, currentUserId }) {
             <form onSubmit={handleAddStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group">
                 <label>Öğrenci Adı Soyadı</label>
-                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} required />
+                <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="Örn: Ahmet Yılmaz" required />
               </div>
               <div className="form-group">
                 <label>Kullanıcı Adı</label>
-                <input type="text" className="input-field" value={username} onChange={e => setUsername(e.target.value)} required />
+                <input type="text" className="input-field" value={username} onChange={e => setUsername(e.target.value)} placeholder="Örn: ahmetyilmaz" required />
               </div>
               <div className="form-group">
                 <label>Telefon Numarası (Opsiyonel)</label>
-                <input type="text" className="input-field" value={phone} onChange={e => setPhone(e.target.value)} />
+                <input type="text" className="input-field" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Örn: 0555 123 4567" />
               </div>
               <div className="form-group">
                 <label>Şifre</label>
-                <input type="password" className="input-field" value={password} onChange={e => setPassword(e.target.value)} required />
+                <input type="password" className="input-field" value={password} onChange={e => setPassword(e.target.value)} placeholder="Şifre belirleyin" required />
               </div>
               <div className="form-group">
                 <label>Eğitim Paketi (Ay)</label>

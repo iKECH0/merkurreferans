@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getUserLevel } from "@/lib/userLevels";
 
 export const metadata = {
   title: "Tüm Canlı Dersler | Admin",
@@ -7,8 +8,16 @@ export const metadata = {
 export default async function AdminLessonsPage() {
   const lessons = await prisma.lesson.findMany({
     include: { 
-      student: true,
-      teacher: true 
+      student: {
+        include: {
+          _count: { select: { referrals: true } }
+        }
+      },
+      teacher: {
+        include: {
+          _count: { select: { referrals: true } }
+        }
+      }
     },
     orderBy: { startTime: 'desc' }
   });
@@ -41,11 +50,51 @@ export default async function AdminLessonsPage() {
                 </tr>
               </thead>
               <tbody>
-                {lessons.map((l) => (
+                {lessons.map((l) => {
+                  const teacherLevel = l.teacher ? getUserLevel(l.teacher.role, l.teacher._count?.referrals || 0) : null;
+                  const studentLevel = l.student ? getUserLevel(l.student.role, l.student._count?.referrals || 0) : null;
+
+                  return (
                   <tr key={l.id}>
                     <td style={{ fontWeight: "500", color: "var(--primary)" }}>{l.title}</td>
-                    <td>{l.teacher?.name || "Bilinmiyor"}</td>
-                    <td>{l.student?.name || "Bilinmiyor"}</td>
+                    <td>
+                      <div>
+                        <span>{l.teacher?.name || "Bilinmiyor"}</span>
+                        {teacherLevel && (
+                          <div style={{ marginTop: '0.2rem' }}>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              padding: '0.1rem 0.4rem',
+                              borderRadius: '6px',
+                              background: `${teacherLevel.color}15`,
+                              border: `1px solid ${teacherLevel.color}40`,
+                              color: teacherLevel.color
+                            }}>
+                              {teacherLevel.icon} {teacherLevel.title}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div>
+                        <span>{l.student?.name || "Bilinmiyor"}</span>
+                        {studentLevel && (
+                          <div style={{ marginTop: '0.2rem' }}>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              padding: '0.1rem 0.4rem',
+                              borderRadius: '6px',
+                              background: `${studentLevel.color}15`,
+                              border: `1px solid ${studentLevel.color}40`,
+                              color: studentLevel.color
+                            }}>
+                              {studentLevel.icon} {studentLevel.title}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       {new Date(l.startTime).toLocaleDateString('tr-TR')} - {new Date(l.startTime).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}
                     </td>
@@ -71,7 +120,8 @@ export default async function AdminLessonsPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

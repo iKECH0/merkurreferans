@@ -20,7 +20,7 @@ export default async function ReferrerDashboard() {
   });
 
   const referralCode = user.referralCode || "YOK";
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://merkurdersplatformu.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://merkurreferans.com.tr";
   const inviteLink = `${baseUrl}/register?ref=${referralCode}`;
 
   const totalStudents = user.referrals.length;

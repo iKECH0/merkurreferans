@@ -1,8 +1,10 @@
 import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import LogoutButton from '@/components/LogoutButton';
 import { LayoutDashboard, Users, Video, Briefcase, GraduationCap, LogOut } from 'lucide-react';
+import { getUserLevel } from '@/lib/userLevels';
 import '../admin/admin.css';
 
 export default async function ReferrerLayout({ children }) {
@@ -12,6 +14,18 @@ export default async function ReferrerLayout({ children }) {
   if (!session || !allowedRoles.includes(session.user.role)) {
     redirect('/login');
   }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      role: true,
+      _count: {
+        select: { referrals: true }
+      }
+    }
+  });
+
+  const levelInfo = getUserLevel(dbUser?.role || session.user.role, dbUser?._count?.referrals || 0);
 
   return (
     <div className="admin-container">
@@ -30,7 +44,7 @@ export default async function ReferrerLayout({ children }) {
             <GraduationCap className="nav-icon" size={20} />
             <span className="nav-text">Öğrenciler</span>
           </Link>
-          {session.user.role === 'LEADER_TEACHER' && (
+          {['TEACHER', 'LEADER_TEACHER'].includes(session.user.role) && (
             <Link href="/referrer/team" className="nav-item">
               <Users className="nav-icon" size={20} />
               <span className="nav-text">Ekibim</span>
@@ -51,11 +65,8 @@ export default async function ReferrerLayout({ children }) {
             <div className="avatar">{session.user.username.charAt(0).toUpperCase()}</div>
             <div>
               <p className="username" style={{ lineHeight: '1.2' }}>{session.user.username}</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--primary)', marginBottom: '0.3rem', fontWeight: 'bold' }}>
-                {session.user.role === 'LEADER_TEACHER' ? 'Lider Eğitmen' : 
-                 session.user.role === 'TEACHER' ? 'Eğitmen' : 
-                 session.user.role === 'PARENT' ? 'Veli (Referans)' : 
-                 'Referans'}
+              <p style={{ fontSize: '0.75rem', color: levelInfo.color, marginBottom: '0.3rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span>{levelInfo.icon}</span> {levelInfo.title}
               </p>
               <LogoutButton className="logout-btn">Çıkış Yap</LogoutButton>
             </div>

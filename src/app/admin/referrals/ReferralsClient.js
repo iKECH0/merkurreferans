@@ -14,7 +14,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
-  const [role, setRole] = useState("LEADER_TEACHER");
+  const [role, setRole] = useState("TEACHER");
   const [referrerId, setReferrerId] = useState("");
   const [addError, setAddError] = useState("");
   const [expandedId, setExpandedId] = useState(null);
@@ -38,7 +38,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
         toast.error(res.error);
       } else {
         toast.success("Kullanıcı başarıyla eklendi.");
-        setName(""); setUsername(""); setPassword(""); setReferralCode(""); setRole("LEADER_TEACHER"); setReferrerId("");
+        setName(""); setUsername(""); setPassword(""); setReferralCode(""); setRole("TEACHER"); setReferrerId("");
         setActiveTab("REFERANSLAR");
       }
     });
@@ -222,34 +222,39 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                   {/* EXPANDED NETWORK ROW */}
                   {expandedId === referrer.id && (
                     <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
-                      <td colSpan="7" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
+                      <td colSpan="8" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
                         <h4 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>{referrer.name} Ağ Detayı</h4>
                         {referrer.referrals.length === 0 ? (
                           <p style={{ color: 'var(--text-muted)' }}>Bu kullanıcının altında kimse yok.</p>
                         ) : (
                           <div style={{ display: 'grid', gap: '0.5rem' }}>
-                            {referrer.referrals.map(refUser => (
-                              <div key={refUser.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                                <div>
-                                  <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{refUser.name}</span>
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({refUser.username})</span>
+                            {referrer.referrals.map(refUser => {
+                              const refUserLevel = getUserLevel(refUser.role, refUser._count?.referrals || refUser.referrals?.length || 0);
+                              return (
+                                <div key={refUser.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                                  <div>
+                                    <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{refUser.name}</span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({refUser.username})</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <span style={{ 
+                                      padding: '0.2rem 0.5rem', 
+                                      borderRadius: '8px', 
+                                      fontSize: '0.75rem',
+                                      background: `${refUserLevel.color}15`,
+                                      border: `1px solid ${refUserLevel.color}40`,
+                                      color: refUserLevel.color,
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      {refUserLevel.icon} {refUserLevel.title}
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                      Kayıt: {new Date(refUser.createdAt).toLocaleDateString('tr-TR')}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div>
-                                  <span style={{ 
-                                    padding: '0.2rem 0.5rem', 
-                                    borderRadius: '12px', 
-                                    fontSize: '0.75rem',
-                                    background: refUser.role === 'STUDENT' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(139, 92, 246, 0.2)',
-                                    color: refUser.role === 'STUDENT' ? '#60a5fa' : '#c084fc'
-                                  }}>
-                                    {refUser.role === 'STUDENT' ? 'Öğrenci' : 'Alt Referans / Öğretmen'}
-                                  </span>
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '1rem' }}>
-                                    Kayıt: {new Date(refUser.createdAt).toLocaleDateString('tr-TR')}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </td>
@@ -260,7 +265,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
               })}
               {initialReferrers.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>Henüz kayıtlı referans yok.</td>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>Henüz kayıtlı referans yok.</td>
                 </tr>
               )}
             </tbody>
@@ -342,16 +347,25 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
               </tr>
             </thead>
             <tbody>
-              {initialWallets?.map(wallet => (
+              {initialWallets?.map(wallet => {
+                const walletUserLevel = getUserLevel(wallet.user.role, wallet.user._count?.referrals || wallet.user.referrals?.length || 0);
+                return (
                 <tr key={wallet.id}>
                   <td style={{ fontWeight: 'bold' }}>{wallet.user.name || wallet.user.username}</td>
                   <td>
-                    <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                      {wallet.user.role === 'LEADER_TEACHER' ? '🚀 Lider Öğretmen'
-                        : wallet.user.role === 'TEACHER' ? '👨‍🏫 Öğretmen'
-                        : wallet.user.role === 'PARENT' ? '🏠 Veli / Bayi'
-                        : wallet.user.role === 'STUDENT' ? '🎓 Öğrenci'
-                        : wallet.user.role}
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      padding: '0.15rem 0.5rem', 
+                      background: `${walletUserLevel.color}15`, 
+                      borderRadius: '8px', 
+                      border: `1px solid ${walletUserLevel.color}40`, 
+                      color: walletUserLevel.color, 
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}>
+                      {walletUserLevel.icon} {walletUserLevel.title}
                     </span>
                   </td>
                   <td style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem' }}>₺{wallet.balance.toFixed(2)}</td>
@@ -371,7 +385,8 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {(!initialWallets || initialWallets.length === 0) && (
                 <tr>
                   <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Şu an çekilebilir bakiyesi olan kullanıcı bulunmuyor.</td>
@@ -401,16 +416,15 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
               <input type="password" className="input-field" value={password} onChange={e => setPassword(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Referans Kodu (Örn: AHMET2026)</label>
-              <input type="text" className="input-field" value={referralCode} onChange={e => setReferralCode(e.target.value)} required />
+              <label>Referans Kodu (Örn: Merkür2026)</label>
+              <input type="text" className="input-field" value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="Örn: Merkür2026" required />
             </div>
             <div className="form-group">
               <label>Kullanıcı Rolü</label>
               <select className="input-field" value={role} onChange={e => setRole(e.target.value)}>
-                <option value="LEADER_TEACHER">Lider Öğretmen (Ana Referans)</option>
-                <option value="TEACHER">Aktif Referans (Alt Öğretmen)</option>
-                <option value="PARENT">Veli (Referans Merkezi)</option>
-                <option value="STUDENT">Öğrenci</option>
+                <option value="TEACHER">👨‍🏫 Öğretmen (Eğitmen)</option>
+                <option value="PARENT">🏠 Veli / Bayi</option>
+                <option value="STUDENT">🎓 Öğrenci</option>
               </select>
             </div>
             <div className="form-group">

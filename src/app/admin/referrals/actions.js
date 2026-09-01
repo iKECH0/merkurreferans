@@ -8,7 +8,7 @@ export async function addReferrer(formData) {
   const username = formData.get("username");
   const password = formData.get("password");
   const referralCode = formData.get("referralCode");
-  const role = formData.get("role") || "LEADER_TEACHER";
+  const role = formData.get("role") || "TEACHER";
   const referrerId = formData.get("referrerId"); // optional
 
   if (!name || !username || !password || !referralCode) {

@@ -7,9 +7,14 @@ export default async function ReferralsPage() {
       role: { in: ["LEADER_TEACHER", "TEACHER", "PARENT"] }
     },
     include: {
-      referrals: true,
+      referrals: {
+        include: {
+          _count: { select: { referrals: true } }
+        }
+      },
       commissionsEarned: true,
-      wallet: true
+      wallet: true,
+      _count: { select: { referrals: true } }
     },
     orderBy: { createdAt: "desc" }
   });
@@ -17,7 +22,11 @@ export default async function ReferralsPage() {
   const walletsWithBalance = await prisma.wallet.findMany({
     where: { balance: { gt: 0 } },
     include: {
-      user: true
+      user: {
+        include: {
+          _count: { select: { referrals: true } }
+        }
+      }
     },
     orderBy: { balance: "desc" }
   });
