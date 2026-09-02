@@ -3,15 +3,15 @@ const path = require('path');
 
 const appDir = path.join(__dirname, 'android', 'app');
 const gradlePath = path.join(appDir, 'build.gradle');
-const keystoreSrc = path.join(__dirname, 'release.keystore');
-const keystoreDest = path.join(appDir, 'release.keystore');
+const keystoreSrc = path.join(__dirname, 'upload.keystore');
+const keystoreDest = path.join(appDir, 'upload.keystore');
 
-// 1. Copy release.keystore directly into android/app/
+// 1. Copy upload.keystore directly into android/app/
 if (fs.existsSync(keystoreSrc)) {
   fs.copyFileSync(keystoreSrc, keystoreDest);
-  console.log('✅ release.keystore copied directly into android/app/release.keystore');
+  console.log('✅ upload.keystore copied directly into android/app/upload.keystore');
 } else {
-  console.error('❌ release.keystore not found at', keystoreSrc);
+  console.error('❌ upload.keystore not found at', keystoreSrc);
 }
 
 if (!fs.existsSync(gradlePath)) {
@@ -21,17 +21,17 @@ if (!fs.existsSync(gradlePath)) {
 
 let content = fs.readFileSync(gradlePath, 'utf8');
 
-// 2. Define release signing block pointing to release.keystore in the same directory
+// 2. Define release signing block pointing to upload.keystore in the same directory
 const releaseSigningBlock = `
         release {
-            storeFile file('release.keystore')
-            storePassword 'merkurreferans2026'
-            keyAlias 'merkurkey'
-            keyPassword 'merkurreferans2026'
+            storeFile file('upload.keystore')
+            storePassword 'merkuryorunge'
+            keyAlias 'upload'
+            keyPassword 'merkuryorunge'
         }
 `;
 
-if (content.includes('signingConfigs {') && !content.includes("keyAlias 'merkurkey'")) {
+if (content.includes('signingConfigs {') && !content.includes("keyAlias 'upload'")) {
   content = content.replace('signingConfigs {', `signingConfigs {${releaseSigningBlock}`);
 }
 
