@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Merkür Referans",
+    "slug": "merkur-referans",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#0b0f19"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.merkurreferans.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Canlı ders ve profil işlemleri için kamera izni gereklidir.",
+        "NSMicrophoneUsageDescription": "Canlı ders sesli katılım için mikrofon izni gereklidir."
+      }
+    },
+    "android": {
+      "package": "com.merkurreferans.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b0f19"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0b0f19",
+          "image": "./assets/splash.png"
+        }
+      ]
+    ]
+  }
+}

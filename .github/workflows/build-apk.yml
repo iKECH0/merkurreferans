@@ -1,0 +1,65 @@
+name: 📱 Build Android APK
+
+on:
+  workflow_dispatch: # GitHub web arayüzünden tek tıkla çalıştırma
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build-android:
+    name: 🚀 Build Standalone APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Proje Kodlarını Çek (Checkout)
+        uses: actions/checkout@v4
+
+      - name: ☕ Java 17 Kurulumu
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📱 Android SDK Kurulumu
+        uses: android-actions/setup-android@v3
+
+      - name: 🟢 Node.js 20 Kurulumu
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: mobile/package.json
+
+      - name: 📦 Mobil Paketleri Yükle
+        run: |
+          cd mobile
+          npm install
+
+      - name: ⚙️ Expo Prebuild (Android Projesini Oluştur)
+        run: |
+          cd mobile
+          npx expo prebuild --platform android --clean
+
+      - name: 🔨 Gradle ile APK Derle
+        run: |
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: 📂 APK Dosyasını Hazırla
+        run: |
+          mkdir -p output
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk output/MerkurReferans.apk
+          echo "APK başarıyla hazırlandı:"
+          ls -lh output/
+
+      - name: 📤 APK'yı İndirilebilir Dosya Olarak Yükle (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MerkurReferans-Android-APK
+          path: output/MerkurReferans.apk
+          retention-days: 30
