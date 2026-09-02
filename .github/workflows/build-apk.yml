@@ -1,7 +1,7 @@
-name: 📱 Build Android APK
+name: 📱 Build Android App (AAB & APK)
 
 on:
-  workflow_dispatch: # GitHub web arayüzünden tek tıkla çalıştırma
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-android:
-    name: 🚀 Build Standalone APK
+    name: 🚀 Build Google Play AAB & Test APK
     runs-on: ubuntu-latest
 
     steps:
@@ -39,27 +39,41 @@ jobs:
           cd mobile
           npm install
 
-      - name: ⚙️ Expo Prebuild (Android Projesini Oluştur)
+      - name: ⚙️ Expo Prebuild & İmzalama Yapılandırması
         run: |
           cd mobile
           npx expo prebuild --platform android --clean
+          node configure-signing.js
 
-      - name: 🔨 Gradle ile APK Derle
+      - name: 🔨 Google Play için AAB Derle (bundleRelease)
         run: |
           cd mobile/android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew bundleRelease
 
-      - name: 📂 APK Dosyasını Hazırla
+      - name: 🔨 Doğrudan Yükleme için APK Derle
+        run: |
+          cd mobile/android
+          ./gradlew assembleRelease || ./gradlew assembleDebug
+
+      - name: 📂 Çıktıları Hazırla
         run: |
           mkdir -p output
-          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk output/MerkurReferans.apk
-          echo "APK başarıyla hazırlandı:"
+          find mobile/android/app/build/outputs/bundle/ -name "*.aab" -exec cp {} output/MerkurReferans.aab \;
+          find mobile/android/app/build/outputs/apk/ -name "*.apk" -exec cp {} output/MerkurReferans.apk \;
+          echo "Üretilen dosyalar:"
           ls -lh output/
 
-      - name: 📤 APK'yı İndirilebilir Dosya Olarak Yükle (Artifact)
+      - name: 📤 Google Play AAB Dosyasını Yükle
         uses: actions/upload-artifact@v4
         with:
-          name: MerkurReferans-Android-APK
+          name: MerkurReferans-GooglePlay-AAB
+          path: output/MerkurReferans.aab
+          retention-days: 30
+
+      - name: 📤 Test APK Dosyasını Yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: MerkurReferans-Test-APK
           path: output/MerkurReferans.apk
           retention-days: 30
