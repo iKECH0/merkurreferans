@@ -1,7 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 
-const gradlePath = path.join(__dirname, 'android', 'app', 'build.gradle');
+const appDir = path.join(__dirname, 'android', 'app');
+const gradlePath = path.join(appDir, 'build.gradle');
+const keystoreSrc = path.join(__dirname, 'release.keystore');
+const keystoreDest = path.join(appDir, 'release.keystore');
+
+// 1. Copy release.keystore directly into android/app/
+if (fs.existsSync(keystoreSrc)) {
+  fs.copyFileSync(keystoreSrc, keystoreDest);
+  console.log('✅ release.keystore copied directly into android/app/release.keystore');
+} else {
+  console.error('❌ release.keystore not found at', keystoreSrc);
+}
 
 if (!fs.existsSync(gradlePath)) {
   console.error('build.gradle not found at', gradlePath);
@@ -10,32 +21,30 @@ if (!fs.existsSync(gradlePath)) {
 
 let content = fs.readFileSync(gradlePath, 'utf8');
 
-// Define release signing config pointing to mobile/release.keystore
+// 2. Define release signing block pointing to release.keystore in the same directory
 const releaseSigningBlock = `
         release {
-            storeFile file('../../release.keystore')
+            storeFile file('release.keystore')
             storePassword 'merkurreferans2026'
             keyAlias 'merkurkey'
             keyPassword 'merkurreferans2026'
         }
 `;
 
-// Insert release signingConfig
-if (content.includes('signingConfigs {') && !content.includes('keyAlias \'merkurkey\'')) {
+if (content.includes('signingConfigs {') && !content.includes("keyAlias 'merkurkey'")) {
   content = content.replace('signingConfigs {', `signingConfigs {${releaseSigningBlock}`);
 }
 
-// Ensure release buildType uses release signingConfig
+// 3. Ensure release buildType uses signingConfigs.release
 content = content.replace(
-  /buildTypes\s*\{\s*release\s*\{([^}]*?)signingConfig\s+signingConfigs\.\w+/s,
-  (match, p1) => `buildTypes {\n        release {${p1}signingConfig signingConfigs.release`
+  /(release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.\w+/,
+  '$1signingConfigs.release'
 );
 
-// If signingConfig wasn't in release block at all, inject it
 if (!content.includes('signingConfig signingConfigs.release')) {
   content = content.replace(
-    'buildTypes {\n        release {',
-    'buildTypes {\n        release {\n            signingConfig signingConfigs.release'
+    /release\s*\{/,
+    'release {\n            signingConfig signingConfigs.release'
   );
 }
 
