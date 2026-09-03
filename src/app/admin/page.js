@@ -1,7 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { Users, GraduationCap, BookOpen, Wallet } from 'lucide-react';
+import PendingDeletionsClient from "./PendingDeletionsClient";
 
 export default async function AdminDashboard() {
+  const pendingDeletions = await prisma.deletionRequest.findMany({
+    where: { status: 'PENDING' },
+    orderBy: { createdAt: 'desc' }
+  });
+
   const totalStudents = await prisma.user.count({
     where: { role: 'STUDENT' }
   });
@@ -18,6 +24,7 @@ export default async function AdminDashboard() {
 
   return (
     <div className="dashboard-wrapper">
+      <PendingDeletionsClient initialRequests={pendingDeletions} />
       <div className="stats-grid">
         <div className="stat-card glass-panel tilt-effect" style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
           <div style={{ color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

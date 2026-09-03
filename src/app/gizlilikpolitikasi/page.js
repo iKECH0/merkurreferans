@@ -102,8 +102,16 @@ export default function PrivacyPolicyPage() {
               6. Kullanıcı Hakları ve Hesap Silme (Google Play Uyumlu)
             </h2>
             <p>
-              Kullanıcılarımız 6698 sayılı KVKK ve Google Play politikaları kapsamında; verilerini görüntüleme, düzeltme veya <strong>hesaplarını ve tüm ilişkili verilerini kalıcı olarak sildirme</strong> hakkına sahiptir. Hesap silme talepleriniz için platform içi destekten veya aşağıdaki iletişim kanalından bize ulaşabilirsiniz.
+              Kullanıcılarımız 6698 sayılı KVKK ve Google Play politikaları kapsamında; verilerini görüntüleme, düzeltme veya <strong>hesaplarını ve tüm ilişkili verilerini kalıcı olarak sildirme</strong> hakkına sahiptir.
             </p>
+            <div style={{ marginTop: '14px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '14px 18px', borderRadius: '8px' }}>
+              <p style={{ margin: 0, color: '#f8fafc', fontSize: '0.95rem' }}>
+                Hesabınızı ve kişisel verilerinizi kalıcı olarak silmek için web sitemiz üzerinden hemen talep oluşturabilirsiniz:{' '}
+                <a href="/hesapsilme" style={{ color: '#f87171', fontWeight: 600, textDecoration: 'underline' }}>
+                  Hesap ve Veri Silme Talebi Sayfası →
+                </a>
+              </p>
+            </div>
           </section>
 
           <section style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
