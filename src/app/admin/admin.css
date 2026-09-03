@@ -216,7 +216,7 @@
   font-weight: 500;
 }
 
-/* --- MOBILE RESPONSIVENESS (Premium Floating Dock) --- */
+/* --- MOBILE RESPONSIVENESS (Premium Simple Pill Dock) --- */
 @media (max-width: 768px) {
   .admin-container {
     flex-direction: column;
@@ -230,19 +230,18 @@
     bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
-    width: 90%;
-    max-width: 400px;
+    width: auto; /* Shrink to fit */
+    display: inline-flex;
     height: auto;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 99px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
     z-index: 1000;
-    background: rgba(11, 15, 25, 0.75);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    padding: 0.4rem 0.5rem;
-    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.1),
-                0 0 20px rgba(16, 185, 129, 0.15); /* Subtle green outer glow */
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 0.35rem; /* Tighter overall padding */
+    box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.5), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.05); /* Softer shadow, no neon */
   }
 
   .sidebar-header {
@@ -257,62 +256,49 @@
     flex-direction: row;
     flex-wrap: nowrap;
     padding: 0;
-    gap: 0.25rem;
-    justify-content: space-between;
+    gap: 0.35rem;
+    justify-content: center;
+    align-items: center;
   }
 
   .nav-item {
-    padding: 0.5rem;
-    font-size: 0.65rem;
-    flex: 1 1 0;
-    flex-direction: column;
-    gap: 0.35rem;
+    padding: 0.6rem 1.25rem; /* Wider horizontal padding */
+    font-size: 0.85rem;
+    flex: 0 0 auto;
+    flex-direction: row; /* Icon and text side-by-side */
+    align-items: center;
+    gap: 0.5rem;
     text-align: center;
     white-space: nowrap;
     justify-content: center;
-    border-radius: 99px;
-    color: #94a3b8;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
+    border-radius: 999px;
+    color: #cbd5e1;
+    transition: all 0.2s ease;
   }
 
   .nav-item:hover, .nav-item:active, .nav-item:focus {
-    background: rgba(16, 185, 129, 0.12);
-    color: #10b981;
-  }
-
-  /* Glowing dot indicator for active/hover */
-  .nav-item:hover::after, .nav-item:active::after {
-    content: '';
-    position: absolute;
-    bottom: 2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 4px;
-    height: 4px;
-    background: #10b981;
-    border-radius: 50%;
-    box-shadow: 0 0 8px #10b981;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
   }
 
   .nav-item .nav-icon {
-    font-size: 1.4rem;
-    margin: 0 auto;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1.1rem;
+    margin: 0;
+    transition: transform 0.2s ease;
   }
 
   .nav-item:hover .nav-icon, .nav-item:active .nav-icon {
-    transform: translateY(-2px) scale(1.1);
+    transform: scale(1.1);
   }
   
   .nav-item .nav-text {
-    font-weight: 600;
-    letter-spacing: 0.3px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
   }
 
   .admin-content {
     padding: 1rem;
-    padding-bottom: 120px; /* Leave enough space for floating dock */
+    padding-bottom: 90px;
     height: auto;
     overflow-y: visible;
   }
