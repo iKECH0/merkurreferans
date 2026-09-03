@@ -44,17 +44,32 @@ jobs:
           cd mobile
           npx expo prebuild --platform android --clean
           node configure-signing.js
+          mkdir -p android/app
+          cp upload.keystore android/app/upload.keystore
 
       - name: 🔨 Google Play için AAB Derle (bundleRelease)
         run: |
           cd mobile/android
           chmod +x gradlew
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/upload.keystore \
+            -Pandroid.injected.signing.store.password=merkuryorunge \
+            -Pandroid.injected.signing.key.alias=upload \
+            -Pandroid.injected.signing.key.password=merkuryorunge
 
       - name: 🔨 Doğrudan Yükleme için APK Derle
         run: |
           cd mobile/android
-          ./gradlew assembleRelease || ./gradlew assembleDebug
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/upload.keystore \
+            -Pandroid.injected.signing.store.password=merkuryorunge \
+            -Pandroid.injected.signing.key.alias=upload \
+            -Pandroid.injected.signing.key.password=merkuryorunge || ./gradlew assembleDebug
+
+      - name: 🔍 İmzayı Doğrula (Verify SHA1)
+        run: |
+          echo "=== AAB Sertifika Bilgileri ==="
+          keytool -printcert -jarfile mobile/android/app/build/outputs/bundle/release/app-release.aab | grep -E "SHA1|Owner" || true
 
       - name: 📂 Çıktıları Hazırla
         run: |
