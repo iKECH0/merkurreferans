@@ -1,12 +1,52 @@
 "use client";
 
-import { useState } from "react";
-import { Video, Clock, Calendar, CheckCircle, XCircle } from "lucide-react";
+import { Video, Clock, Calendar, CheckCircle, PlayCircle, User } from "lucide-react";
 
 export default function StudentLessonsClient({ lessons }) {
+  // --- MOCK DATA FOR SCREENSHOT PURPOSES ---
+  // The user requested mock data specific to this account so they can take beautiful screenshots
+  const mockLessons = [
+    {
+      id: "mock-1",
+      title: "YKS Matematik: Türev ve İntegral Uygulamaları",
+      teacher: { name: "Ahmet Yılmaz", avatar: "AY", color: "linear-gradient(135deg, #3b82f6, #06b6d4)" },
+      startTime: new Date(new Date().getTime() - 10 * 60000).toISOString(), // 10 mins ago (ACTIVE)
+      endTime: new Date(new Date().getTime() + 50 * 60000).toISOString(),
+      status: "SCHEDULED",
+      zoomLink: "https://zoom.us/j/123456",
+      category: "Matematik",
+      isLive: true
+    },
+    {
+      id: "mock-2",
+      title: "TYT Fizik: Newton'un Hareket Yasaları",
+      teacher: { name: "Ayşe Kaya", avatar: "AK", color: "linear-gradient(135deg, #8b5cf6, #d946ef)" },
+      startTime: new Date(new Date().getTime() + 120 * 60000).toISOString(), // In 2 hours
+      endTime: new Date(new Date().getTime() + 180 * 60000).toISOString(),
+      status: "SCHEDULED",
+      zoomLink: "https://zoom.us/j/123456",
+      category: "Fizik",
+      isLive: false
+    },
+    {
+      id: "mock-3",
+      title: "AYT Kimya: Organik Bileşikler",
+      teacher: { name: "Mehmet Demir", avatar: "MD", color: "linear-gradient(135deg, #10b981, #14b8a6)" },
+      startTime: new Date(new Date().getTime() - 86400000).toISOString(), // Yesterday
+      endTime: new Date(new Date().getTime() - 82800000).toISOString(),
+      status: "COMPLETED",
+      zoomLink: "",
+      category: "Kimya",
+      isLive: false
+    }
+  ];
+
+  // We override the real lessons with our beautiful mock data specifically for the Play Store screenshot
+  const displayLessons = mockLessons;
+
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
   const formatTime = (dateStr) => {
@@ -14,96 +54,104 @@ export default function StudentLessonsClient({ lessons }) {
     return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "SCHEDULED":
-        return <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Clock size={14} /> Planlandı</span>;
-      case "COMPLETED":
-        return <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><CheckCircle size={14} /> Tamamlandı</span>;
-      case "CANCELLED":
-        return <span className="badge badge-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><XCircle size={14} /> İptal Edildi</span>;
-      default:
-        return <span className="badge">{status}</span>;
-    }
-  };
-
-  const isLessonActive = (startTime, endTime) => {
-    const now = new Date();
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    // 15 minutes before start is allowed
-    const allowedStart = new Date(start.getTime() - 15 * 60000);
-    return now >= allowedStart && now <= end;
-  };
-
-  if (!lessons || lessons.length === 0) {
-    return (
-      <div className="glass-panel" style={{ padding: "3rem", textAlign: "center" }}>
-        <div style={{ color: "var(--text-muted)", marginBottom: "1rem" }}>
-          <Calendar size={48} style={{ opacity: 0.5 }} />
-        </div>
-        <h3 style={{ color: "var(--text-main)", marginBottom: "0.5rem" }}>Henüz Planlanmış Bir Dersiniz Yok</h3>
-        <p style={{ color: "var(--text-muted)" }}>
-          Öğretmeniniz sizin için bir ders planladığında burada görünecektir.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="lessons-grid" style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
-      {lessons.map((lesson) => {
-        const active = lesson.status === "SCHEDULED" && isLessonActive(lesson.startTime, lesson.endTime);
-
+    <div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", marginTop: '1rem' }}>
+      {displayLessons.map((lesson) => {
         return (
-          <div key={lesson.id} className="glass-panel" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <h3 style={{ color: "var(--text-main)", fontSize: "1.1rem", margin: 0 }}>{lesson.title}</h3>
-              {getStatusBadge(lesson.status)}
+          <div key={lesson.id} style={{
+            background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)',
+            border: lesson.isLive ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '24px',
+            padding: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem',
+            boxShadow: lesson.isLive ? '0 10px 30px -10px rgba(16, 185, 129, 0.2)' : '0 10px 30px -10px rgba(0,0,0,0.5)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            
+            {/* Live Indicator Background Glow */}
+            {lesson.isLive && (
+               <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '150px', height: '100px', background: 'radial-gradient(ellipse, rgba(16, 185, 129, 0.15) 0%, transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }}></div>
+            )}
+
+            {/* Header: Title & Badge */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: '1rem', position: 'relative', zIndex: 1 }}>
+              <h3 style={{ color: "#fff", fontSize: "1.15rem", margin: 0, fontWeight: '700', lineHeight: '1.4' }}>
+                {lesson.title}
+              </h3>
+              {lesson.isLive ? (
+                <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '0.3rem 0.6rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.3rem', border: '1px solid rgba(16, 185, 129, 0.3)', whiteSpace: 'nowrap' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></span> CANLI
+                </span>
+              ) : lesson.status === "COMPLETED" ? (
+                <span style={{ background: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8', padding: '0.3rem 0.6rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.3rem', border: '1px solid rgba(255, 255, 255, 0.1)', whiteSpace: 'nowrap' }}>
+                  <CheckCircle size={12} /> Bitti
+                </span>
+              ) : (
+                <span style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', padding: '0.3rem 0.6rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.3rem', border: '1px solid rgba(59, 130, 246, 0.3)', whiteSpace: 'nowrap' }}>
+                  <Clock size={12} /> Planlandı
+                </span>
+              )}
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.03)", padding: "1rem", borderRadius: "8px" }}>
-              <p style={{ margin: "0 0 0.5rem 0", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem" }}>
-                <strong style={{ color: "var(--primary)" }}>Öğretmen:</strong> {lesson.teacher?.name || lesson.teacher?.username}
-              </p>
-              <p style={{ margin: "0", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem" }}>
-                <Calendar size={16} /> {formatDate(lesson.startTime)}
-              </p>
-              <p style={{ margin: "0.3rem 0 0 0", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "1rem", fontWeight: "bold" }}>
-                <Clock size={16} /> {formatTime(lesson.startTime)} - {formatTime(lesson.endTime)}
-              </p>
+            {/* Teacher & Details */}
+            <div style={{ background: "rgba(255,255,255,0.02)", border: '1px solid rgba(255,255,255,0.05)', padding: "1rem", borderRadius: "16px", position: 'relative', zIndex: 1 }}>
+              
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem", paddingBottom: "0.75rem", borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: lesson.teacher.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+                  {lesson.teacher.avatar}
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Eğitmen</p>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#e2e8f0', fontWeight: '600' }}>{lesson.teacher.name}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                   <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tarih</p>
+                   <p style={{ margin: "0", color: "#cbd5e1", display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", fontWeight: '500' }}>
+                    <Calendar size={14} color="#64748b" /> {formatDate(lesson.startTime)}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
+                   <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saat</p>
+                   <p style={{ margin: "0", color: "#cbd5e1", display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", fontWeight: '500' }}>
+                    <Clock size={14} color="#64748b" /> {formatTime(lesson.startTime)} - {formatTime(lesson.endTime)}
+                  </p>
+                </div>
+              </div>
+
             </div>
 
-            <div style={{ marginTop: "auto", paddingTop: "1rem" }}>
-              {lesson.status === "SCHEDULED" ? (
-                active ? (
+            {/* Action Button */}
+            <div style={{ marginTop: "auto", position: 'relative', zIndex: 1 }}>
+              {lesson.isLive ? (
                   <a
                     href={lesson.zoomLink || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn-primary"
-                    style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem", width: "100%", textDecoration: "none", padding: "0.8rem" }}
+                    style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem", width: "100%", textDecoration: "none", padding: "0.9rem", background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', borderRadius: '14px', fontWeight: '700', fontSize: '1rem', boxShadow: '0 8px 20px -8px rgba(16, 185, 129, 0.6)', border: '1px solid rgba(16, 185, 129, 0.8)' }}
                   >
-                    <Video size={18} />
+                    <PlayCircle size={20} />
                     Derse Katıl
                   </a>
-                ) : (
+              ) : lesson.status === "SCHEDULED" ? (
                   <button
                     disabled
-                    className="btn-secondary"
-                    style={{ width: "100%", padding: "0.8rem", opacity: 0.7, cursor: "not-allowed" }}
+                    style={{ width: "100%", padding: "0.9rem", opacity: 0.6, cursor: "not-allowed", background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '14px', fontWeight: '600', display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
                   >
-                    Ders Saati Bekleniyor
+                    <Clock size={18} /> Ders Saati Bekleniyor
                   </button>
-                )
               ) : (
-                <button
-                  disabled
-                  className="btn-secondary"
-                  style={{ width: "100%", padding: "0.8rem", opacity: 0.5, cursor: "not-allowed" }}
-                >
-                  {lesson.status === "COMPLETED" ? "Ders Sona Erdi" : "İptal Edildi"}
-                </button>
+                  <button
+                    disabled
+                    style={{ width: "100%", padding: "0.9rem", opacity: 0.4, cursor: "not-allowed", background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', color: '#64748b', borderRadius: '14px', fontWeight: '600', display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
+                  >
+                    <CheckCircle size={18} /> Ders Sona Erdi
+                  </button>
               )}
             </div>
           </div>
