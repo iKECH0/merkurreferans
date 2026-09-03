@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { ArrowRight, Video } from 'lucide-react';
+import { ArrowRight, Video, CheckCircle2 } from 'lucide-react';
 import './globals.css';
 
 export default function ReferansLandingPage() {
@@ -39,7 +39,9 @@ export default function ReferansLandingPage() {
         </Link>
 
         <div className="hero-trust-min">
-          ✓ Ücretsiz &nbsp;·&nbsp; ✓ Anında Kurulum &nbsp;·&nbsp; ✓ KVKK Uyumlu
+          <span><CheckCircle2 size={16} color="#10b981" /> Ücretsiz</span>
+          <span><CheckCircle2 size={16} color="#10b981" /> Anında Kurulum</span>
+          <span><CheckCircle2 size={16} color="#10b981" /> KVKK Uyumlu</span>
         </div>
       </section>
 
