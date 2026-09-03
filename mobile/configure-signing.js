@@ -48,23 +48,33 @@ if (!content.includes('signingConfig signingConfigs.release')) {
   );
 }
 
-// 4. Force targetSdkVersion and compileSdkVersion to 36 for Google Play requirement
-content = content.replace(/targetSdkVersion\s+\d+/g, 'targetSdkVersion 36');
-content = content.replace(/compileSdkVersion\s+\d+/g, 'compileSdkVersion 36');
-content = content.replace(/compileSdk\s+\d+/g, 'compileSdk 36');
-content = content.replace(/targetSdk\s+\d+/g, 'targetSdk 36');
-content = content.replace(/versionCode\s+\d+/g, 'versionCode 2');
-content = content.replace(/versionName\s+"[^"]+"/g, 'versionName "1.0.1"');
+// 4. Force targetSdkVersion and compileSdkVersion to 36, and versionCode to 3
+content = content.replace(/targetSdkVersion\s+.*$/gm, 'targetSdkVersion 36');
+content = content.replace(/compileSdkVersion\s+.*$/gm, 'compileSdkVersion 36');
+content = content.replace(/compileSdk\s+.*$/gm, 'compileSdk 36');
+content = content.replace(/targetSdk\s+.*$/gm, 'targetSdk 36');
+content = content.replace(/versionCode\s+.*$/gm, 'versionCode 3');
+content = content.replace(/versionName\s+.*$/gm, 'versionName "1.0.2"');
 
 fs.writeFileSync(gradlePath, content, 'utf8');
-console.log('✅ Release signing, API Level 36 and versionCode 2 configured successfully in app/build.gradle');
+console.log('✅ Release signing, API Level 36 and versionCode 3 configured successfully in app/build.gradle');
 
 // 5. Also update root android/build.gradle
 const rootGradlePath = path.join(__dirname, 'android', 'build.gradle');
 if (fs.existsSync(rootGradlePath)) {
   let rootContent = fs.readFileSync(rootGradlePath, 'utf8');
-  rootContent = rootContent.replace(/compileSdkVersion\s*=\s*\d+/g, 'compileSdkVersion = 36');
-  rootContent = rootContent.replace(/targetSdkVersion\s*=\s*\d+/g, 'targetSdkVersion = 36');
+  rootContent = rootContent.replace(/targetSdkVersion\s*=\s*.*$/gm, 'targetSdkVersion = 36');
+  rootContent = rootContent.replace(/compileSdkVersion\s*=\s*.*$/gm, 'compileSdkVersion = 36');
+  rootContent = rootContent.replace(/buildToolsVersion\s*=\s*.*$/gm, "buildToolsVersion = '36.0.0'");
   fs.writeFileSync(rootGradlePath, rootContent, 'utf8');
   console.log('✅ API Level 36 configured successfully in root android/build.gradle');
+}
+
+// 6. Also write to android/gradle.properties
+const propertiesPath = path.join(__dirname, 'android', 'gradle.properties');
+if (fs.existsSync(propertiesPath)) {
+  let propContent = fs.readFileSync(propertiesPath, 'utf8');
+  propContent += '\nandroid.targetSdkVersion=36\nandroid.compileSdkVersion=36\nandroid.buildToolsVersion=36.0.0\n';
+  fs.writeFileSync(propertiesPath, propContent, 'utf8');
+  console.log('✅ API Level 36 appended to android/gradle.properties');
 }
