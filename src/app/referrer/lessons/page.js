@@ -14,24 +14,65 @@ export default async function LessonsPage() {
     redirect("/login");
   }
 
+  const isTester = session.user.username.toLowerCase() === 'tester';
+
   // Fetch lessons where the current user is the teacher
-  const lessons = await prisma.lesson.findMany({
+  const realLessons = await prisma.lesson.findMany({
     where: { teacherId: session.user.id },
     include: { student: true },
     orderBy: { startTime: 'desc' }
   });
 
-  // Fetch all students to populate the dropdown.
-  // In a real scenario, this might be filtered to students assigned to this teacher,
-  // or students that the teacher has referred.
-  // We'll fetch all students but map their referrerId so the UI knows if it's "Senaryo A" or "Senaryo B"
-  const students = await prisma.user.findMany({
+  const mockLessons = [
+    {
+      id: "mock-lesson-1",
+      title: "YKS Matematik: Türev ve İntegral Uygulamaları",
+      price: 1200,
+      startTime: new Date(Date.now() - 10 * 60000).toISOString(),
+      endTime: new Date(Date.now() + 50 * 60000).toISOString(),
+      status: "SCHEDULED",
+      zoomStartLink: "https://zoom.us/j/123456",
+      student: { name: "Berke Yılmaz", username: "berkeyilmaz" }
+    },
+    {
+      id: "mock-lesson-2",
+      title: "TYT Fizik: Newton'un Hareket Yasaları",
+      price: 950,
+      startTime: new Date(Date.now() + 120 * 60000).toISOString(),
+      endTime: new Date(Date.now() + 180 * 60000).toISOString(),
+      status: "SCHEDULED",
+      zoomStartLink: "https://zoom.us/j/123456",
+      student: { name: "Elif Demir", username: "elifdemir" }
+    },
+    {
+      id: "mock-lesson-3",
+      title: "AYT Geometri: Çemberde Teğet ve Kiriş",
+      price: 850,
+      startTime: new Date(Date.now() - 86400000).toISOString(),
+      endTime: new Date(Date.now() - 82800000).toISOString(),
+      status: "COMPLETED",
+      zoomStartLink: "",
+      student: { name: "Kaan Çetin", username: "kaancetin" }
+    }
+  ];
+
+  const lessons = isTester ? mockLessons : realLessons;
+
+  // Fetch students or fallback to mock
+  const realStudents = await prisma.user.findMany({
     where: { role: "STUDENT" },
     select: { id: true, name: true, username: true, referrerId: true }
   });
 
-  // Attach a property "myId" to help the client evaluate
-  const mappedStudents = students.map(s => ({
+  const mockStudents = [
+    { id: "mock-s-1", name: "Berke Yılmaz", username: "berkeyilmaz", referrerId: session.user.id, myId: session.user.id },
+    { id: "mock-s-2", name: "Elif Demir", username: "elifdemir", referrerId: session.user.id, myId: session.user.id },
+    { id: "mock-s-3", name: "Kaan Çetin", username: "kaancetin", referrerId: session.user.id, myId: session.user.id },
+    { id: "mock-s-4", name: "Zeynep Aydın", username: "zeynepaydin", referrerId: "other", myId: session.user.id },
+    { id: "mock-s-5", name: "Mert Kaya", username: "mertkaya", referrerId: session.user.id, myId: session.user.id },
+  ];
+
+  const mappedStudents = isTester ? mockStudents : realStudents.map(s => ({
     ...s,
     myId: session.user.id
   }));
@@ -39,9 +80,9 @@ export default async function LessonsPage() {
   return (
     <div>
       <div style={{ marginBottom: "2rem" }}>
-        <h2 style={{ color: "var(--text-main)" }}>🎓 Canlı Ders Yönetimi (Zoom)</h2>
+        <h2 style={{ color: "var(--text-main)", fontSize: "1.8rem", fontWeight: "800" }}>🎓 Canlı Ders Yönetimi (Zoom)</h2>
         <p style={{ color: "var(--text-muted)", marginTop: "0.5rem" }}>
-          Öğrencileriniz için birebir canlı dersler oluşturun, Zoom linklerini otomatik yönetin ve ders bitiminde komisyonlarınızı (cüzdanınıza) otomatik aktarın.
+          Öğrencileriniz için birebir canlı dersler oluşturun, Zoom linklerini otomatik yönetin ve ders bitiminde komisyonlarınızı cüzdanınıza aktarın.
         </p>
       </div>
 
