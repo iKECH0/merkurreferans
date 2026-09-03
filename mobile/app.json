@@ -22,9 +22,6 @@
     "android": {
       "package": "com.merkurreferans.app",
       "versionCode": 3,
-      "compileSdkVersion": 36,
-      "targetSdkVersion": 36,
-      "buildToolsVersion": "36.0.0",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0b0f19"
