@@ -2,7 +2,7 @@
   "expo": {
     "name": "Merkür Referans",
     "slug": "merkur-referans",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.merkurreferans.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,
       "buildToolsVersion": "36.0.0",

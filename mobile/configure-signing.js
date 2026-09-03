@@ -53,9 +53,11 @@ content = content.replace(/targetSdkVersion\s+\d+/g, 'targetSdkVersion 36');
 content = content.replace(/compileSdkVersion\s+\d+/g, 'compileSdkVersion 36');
 content = content.replace(/compileSdk\s+\d+/g, 'compileSdk 36');
 content = content.replace(/targetSdk\s+\d+/g, 'targetSdk 36');
+content = content.replace(/versionCode\s+\d+/g, 'versionCode 2');
+content = content.replace(/versionName\s+"[^"]+"/g, 'versionName "1.0.1"');
 
 fs.writeFileSync(gradlePath, content, 'utf8');
-console.log('✅ Release signing and API Level 36 configured successfully in app/build.gradle');
+console.log('✅ Release signing, API Level 36 and versionCode 2 configured successfully in app/build.gradle');
 
 // 5. Also update root android/build.gradle
 const rootGradlePath = path.join(__dirname, 'android', 'build.gradle');
