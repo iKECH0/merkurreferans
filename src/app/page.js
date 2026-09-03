@@ -115,7 +115,7 @@ export default function ReferansLandingPage() {
 
       {/* 2. HERO SECTION */}
       <section style={{
-        padding: '5.5rem 5% 4rem',
+        padding: '4rem 5% 3rem',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -136,8 +136,7 @@ export default function ReferansLandingPage() {
         
         {/* Başlık */}
         <h1 className="hero-title">
-          Eğitimin Yeni<br />
-          Referans Noktası
+          Eğitimin Yeni Referans Noktası
         </h1>
         
         {/* Açıklama */}
@@ -183,7 +182,7 @@ export default function ReferansLandingPage() {
         </div>
 
         {/* Güven Rozetleri */}
-        <div style={{
+        <div className="trust-badges-row" style={{
           display: 'flex',
           gap: '1.5rem',
           flexWrap: 'wrap',
