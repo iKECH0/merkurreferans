@@ -445,3 +445,190 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* ===================================================
+   MODERN LANDING PAGE RESPONSIVE STYLES
+   =================================================== */
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 999px;
+  color: #34d399;
+  font-size: 0.85rem;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  margin-bottom: 1.5rem;
+}
+
+.hero-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+  animation: pulse-dot 1.8s infinite;
+}
+
+.hero-title {
+  font-size: clamp(2.2rem, 5.5vw, 4rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.25rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 40%, #38bdf8 80%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  max-width: 900px;
+}
+
+.hero-desc {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: #94a3b8;
+  max-width: 680px;
+  margin-bottom: 2.5rem;
+  line-height: 1.65;
+}
+
+/* Stats Cards Grid */
+.stats-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.stat-card-modern {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.75rem 1.5rem;
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card-modern:hover {
+  transform: translateY(-4px);
+  border-color: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 12px 30px -10px rgba(56, 189, 248, 0.2);
+}
+
+.stat-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+/* Feature Cards Grid */
+.features-grid-modern {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.feature-card-modern {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 2rem;
+  backdrop-filter: blur(12px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.feature-card-modern:hover {
+  transform: translateY(-5px);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+}
+
+/* Steps Grid */
+.steps-grid-modern {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.step-card-modern {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.step-card-modern:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-4px);
+}
+
+/* Responsive Overrides */
+@media (max-width: 768px) {
+  .landing-nav {
+    padding: 1rem 4%;
+  }
+
+  .landing-logo {
+    font-size: 1.15rem;
+  }
+
+  .landing-nav-buttons .btn-secondary {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .landing-nav-buttons .btn-primary {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .stats-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .steps-grid-modern {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .features-grid-modern {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .cta-buttons-wrap {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .cta-buttons-wrap a {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
