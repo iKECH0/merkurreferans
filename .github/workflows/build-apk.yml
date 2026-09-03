@@ -32,12 +32,12 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: mobile/package.json
+          cache-dependency-path: mobile/package-lock.json
 
       - name: 📦 Mobil Paketleri Yükle
         run: |
           cd mobile
-          npm install
+          npm ci || npm install
 
       - name: ⚙️ Expo Prebuild & İmzalama Yapılandırması
         run: |
@@ -47,8 +47,8 @@ jobs:
           mkdir -p android/app
           cp upload.keystore android/app/upload.keystore
           echo "=== Yapılandırma Kontrolü ==="
-          grep -E "targetSdk|compileSdk|versionCode|versionName" android/app/build.gradle || true
-          grep -E "targetSdk|compileSdk" android/build.gradle || true
+          grep -E "targetSdk|versionCode|versionName" android/app/build.gradle || true
+          grep -E "targetSdk" android/build.gradle || true
 
       - name: 🔨 Google Play için AAB Derle (bundleRelease)
         run: |
@@ -56,7 +56,6 @@ jobs:
           chmod +x gradlew
           ./gradlew bundleRelease --stacktrace \
             -Pandroid.targetSdkVersion=36 \
-            -Pandroid.compileSdkVersion=36 \
             -Pandroid.injected.signing.store.file=$(pwd)/app/upload.keystore \
             -Pandroid.injected.signing.store.password=merkuryorunge \
             -Pandroid.injected.signing.key.alias=upload \
@@ -67,7 +66,6 @@ jobs:
           cd mobile/android
           ./gradlew assembleRelease --stacktrace \
             -Pandroid.targetSdkVersion=36 \
-            -Pandroid.compileSdkVersion=36 \
             -Pandroid.injected.signing.store.file=$(pwd)/app/upload.keystore \
             -Pandroid.injected.signing.store.password=merkuryorunge \
             -Pandroid.injected.signing.key.alias=upload \
