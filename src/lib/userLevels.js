@@ -17,8 +17,8 @@ export function getUserLevel(role, referralCount = 0) {
   // Öğrenci rolü
   if (role === 'STUDENT') return { title: 'Öğrenci', icon: '🎓', color: '#38bdf8', badgeClass: 'badge-student' };
 
-  // Veli / Bayi rolü
-  if (role === 'PARENT') return { title: 'Veli / Bayi', icon: '🏠', color: '#94a3b8', badgeClass: 'badge-parent' };
+  // Veli rolü
+  if (role === 'PARENT') return { title: 'Veli', icon: '🏠', color: '#94a3b8', badgeClass: 'badge-parent' };
 
   // 1. Profesyonel Öğretmen (👑)
   if (role === 'PRO_TEACHER' || referralCount >= 500) {

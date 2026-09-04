@@ -126,7 +126,7 @@ export default function LoginPage() {
                   <Presentation size={28} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Bayi / Eğitmen Portalı</h3>
+                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Öğretmen / Eğitmen Portalı</h3>
                   <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Ağınızı yönetin, ders verin ve komisyonlarınızı izleyin.</p>
                 </div>
               </div>
@@ -144,7 +144,7 @@ export default function LoginPage() {
             
             <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: `1px solid ${selectedPortal === 'student' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`, borderRadius: '24px', padding: '2.5rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
               <h2 style={{ fontSize: '1.5rem', color: '#f8fafc', marginBottom: '2rem', textAlign: 'center' }}>
-                {selectedPortal === 'student' ? 'Öğrenci Girişi' : 'Öğretmen / Bayi Girişi'}
+                {selectedPortal === 'student' ? 'Öğrenci Girişi' : 'Öğretmen / Eğitmen Girişi'}
               </h2>
 
               {error && <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', textAlign: 'center', fontSize: '0.95rem' }}>{error}</div>}

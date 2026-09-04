@@ -91,7 +91,7 @@ model Settings {
 
 model Commission {
   id            String   @id @default(cuid())
-  userId        String   // Bayi (Referrer) ID
+  userId        String   // Referans ID
   sourceUserId  String   // Ödemeyi yapan öğrencinin ID
   lessonId      String?  
   amount        Float    // Komisyon Miktarı

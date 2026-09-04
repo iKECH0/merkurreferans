@@ -34,8 +34,8 @@ export const ROLE_LABELS_TR = {
   ELITE_TEACHER: "Seçkin Öğretmen",
   PRESTIGE_TEACHER: "Prestijli Öğretmen",
   PRO_TEACHER: "Profesyonel Öğretmen",
-  PARENT: "Veli / Bayi",
-  REFERRER: "Referans / Bayi"
+  PARENT: "Veli",
+  REFERRER: "Referans"
 };
 
 export const ROLE_OPTIONS_FOR_REFERRAL = [
@@ -47,7 +47,7 @@ export const ROLE_OPTIONS_FOR_REFERRAL = [
   { value: "ELITE_TEACHER", label: "💎 Seçkin Öğretmen (100+ Öğrenci)" },
   { value: "PRESTIGE_TEACHER", label: "🏆 Prestijli Öğretmen (250+ Öğrenci)" },
   { value: "PRO_TEACHER", label: "👑 Profesyonel Öğretmen (500+ Öğrenci)" },
-  { value: "PARENT", label: "🏠 Veli / Bayi" },
+  { value: "PARENT", label: "🏠 Veli" },
   { value: "STUDENT", label: "🎓 Öğrenci" }
 ];
 
