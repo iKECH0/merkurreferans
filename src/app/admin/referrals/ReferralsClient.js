@@ -3,7 +3,8 @@ import React, { useState, useTransition } from "react";
 import { addReferrer, deleteReferrer, withdrawWalletBalance, updateReferrerIban } from "./actions";
 import toast from 'react-hot-toast';
 import { customConfirm, customPrompt } from "@/lib/toastHelpers";
-import { getUserLevel } from "@/lib/userLevels";
+import { getUserLevel, ALL_LEVELS_INFO } from "@/lib/userLevels";
+import { formatRole, ROLE_OPTIONS_FOR_REFERRAL } from "@/lib/roleConstants";
 
 export default function ReferralsClient({ initialReferrers, initialWallets, initialCommissions }) {
   const [isPending, startTransition] = useTransition();
@@ -107,6 +108,13 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
           Komisyon Akışı
         </button>
         <button 
+          className={`btn-sm ${activeTab === 'KADEMELER' ? 'btn-primary' : ''}`}
+          style={{ background: activeTab !== 'KADEMELER' ? 'transparent' : '', border: activeTab !== 'KADEMELER' ? '1px solid rgba(255,255,255,0.2)' : 'none', color: activeTab !== 'KADEMELER' ? 'white' : '' }}
+          onClick={() => setActiveTab('KADEMELER')}
+        >
+          🏆 10 Kariyer Kademesi
+        </button>
+        <button 
           className={`btn-sm ${activeTab === 'EKLE' ? 'btn-primary' : ''}`}
           style={{ background: activeTab !== 'EKLE' ? 'transparent' : '', border: activeTab !== 'EKLE' ? '1px solid rgba(255,255,255,0.2)' : 'none', marginLeft: 'auto', color: activeTab !== 'EKLE' ? 'white' : '' }}
           onClick={() => setActiveTab('EKLE')}
@@ -173,7 +181,8 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                         <span style={{ fontWeight: isTop ? 'bold' : 'normal' }}>
-                          {isTop && "⭐ "} {referrer.name}
+                          {isTop ? <span>⭐ </span> : null}
+                          <span>{referrer.name}</span>
                         </span>
                         <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', background: `${levelInfo.color}15`, borderRadius: '8px', border: `1px solid ${levelInfo.color}40`, color: levelInfo.color, whiteSpace: 'nowrap', width: 'fit-content' }}>
                           {levelInfo.icon} {levelInfo.title}
@@ -293,11 +302,11 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                   <td>{new Date(comm.createdAt).toLocaleString('tr-TR')}</td>
                   <td>
                     <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{comm.user?.name}</span>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{comm.user?.role}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{formatRole(comm.user?.role)}</div>
                   </td>
                   <td>
                     <span style={{ fontWeight: 'bold' }}>{comm.sourceUser?.name}</span>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{comm.sourceUser?.role}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{formatRole(comm.sourceUser?.role)}</div>
                   </td>
                   <td>
                     {comm.lesson ? (
@@ -397,6 +406,60 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
         </div>
       )}
 
+      {/* TAB CONTENT: KADEMELER */}
+      {activeTab === 'KADEMELER' && (
+        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+          <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ color: '#fff', fontSize: '1.3rem', margin: '0 0 0.4rem 0' }}>🏆 Merkür Kariyer Kademeleri (10 Kademe)</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, maxWidth: '650px' }}>
+                Öğretmenler kayıt ettikleri öğrenci sayısına göre otomatik olarak kademe atlarlar veya Yönetici tarafından doğrudan bu ünvanlara atanabilirler.
+              </p>
+            </div>
+            <button className="btn-primary" onClick={() => setActiveTab('EKLE')}>
+              + Bu Kademede Eğitmen Ekle
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            {ALL_LEVELS_INFO.map((lvl) => (
+              <div key={lvl.role} style={{
+                background: 'rgba(15, 23, 42, 0.65)',
+                border: `1px solid ${lvl.color}35`,
+                borderRadius: '16px',
+                padding: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: `0 4px 20px -5px ${lvl.color}15`
+              }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: lvl.color }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '1.8rem' }}>{lvl.icon}</span>
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: '700', 
+                    padding: '0.2rem 0.6rem', 
+                    borderRadius: '8px', 
+                    background: `${lvl.color}15`, 
+                    color: lvl.color,
+                    border: `1px solid ${lvl.color}40`
+                  }}>
+                    {lvl.minReferrals > 0 ? `${lvl.minReferrals}+ Öğrenci` : 'Temel Kademe'}
+                  </span>
+                </div>
+                <div>
+                  <h4 style={{ color: '#fff', fontSize: '1.05rem', margin: '0 0 0.3rem 0', fontWeight: '700' }}>{lvl.title}</h4>
+                  <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' }}>{lvl.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* TAB CONTENT: EKLE */}
       {activeTab === 'EKLE' && (
         <div style={{ maxWidth: '500px' }}>
@@ -422,9 +485,9 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
             <div className="form-group">
               <label>Kullanıcı Rolü</label>
               <select className="input-field" value={role} onChange={e => setRole(e.target.value)}>
-                <option value="TEACHER">👨‍🏫 Öğretmen (Eğitmen)</option>
-                <option value="PARENT">🏠 Veli / Bayi</option>
-                <option value="STUDENT">🎓 Öğrenci</option>
+                {ROLE_OPTIONS_FOR_REFERRAL.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">
@@ -432,7 +495,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
               <select className="input-field" value={referrerId} onChange={e => setReferrerId(e.target.value)}>
                 <option value="">-- Bağımsız (Üst Referansı Yok) --</option>
                 {initialReferrers.map(ref => (
-                  <option key={ref.id} value={ref.id}>{ref.name} ({ref.role})</option>
+                  <option key={ref.id} value={ref.id}>{ref.name} ({formatRole(ref.role)})</option>
                 ))}
               </select>
             </div>

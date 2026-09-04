@@ -5,13 +5,13 @@ import Link from 'next/link';
 import LogoutButton from '@/components/LogoutButton';
 import { LayoutDashboard, Users, Video, Briefcase, GraduationCap, LogOut } from 'lucide-react';
 import { getUserLevel } from '@/lib/userLevels';
+import { isReferrerRole, isTeacherRole } from '@/lib/roleConstants';
 import '../admin/admin.css';
 
 export default async function ReferrerLayout({ children }) {
   const session = await auth();
 
-  const allowedRoles = ['REFERRER', 'TEACHER', 'LEADER_TEACHER', 'PARENT'];
-  if (!session || !allowedRoles.includes(session.user.role)) {
+  if (!session || !isReferrerRole(session.user.role)) {
     redirect('/login');
   }
 
@@ -44,7 +44,7 @@ export default async function ReferrerLayout({ children }) {
             <GraduationCap className="nav-icon" size={20} />
             <span className="nav-text">Öğrenciler</span>
           </Link>
-          {['TEACHER', 'LEADER_TEACHER'].includes(session.user.role) && (
+          {isTeacherRole(session.user.role) && (
             <Link href="/referrer/team" className="nav-item">
               <Users className="nav-icon" size={20} />
               <span className="nav-text">Ekibim</span>

@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import TeamClient from './TeamClient';
+import { isTeacherRole, TEACHER_ROLES } from '@/lib/roleConstants';
 
 export const metadata = {
   title: "Ekibim | MERKÜR REFERANS",
@@ -11,14 +12,14 @@ export const metadata = {
 export default async function ReferrerTeam() {
   const session = await auth();
   
-  if (!session || !['TEACHER', 'LEADER_TEACHER'].includes(session.user.role)) {
+  if (!session || !isTeacherRole(session.user.role)) {
     redirect('/referrer'); // Sadece Öğretmenler görebilir
   }
 
   const team = await prisma.user.findMany({
     where: { 
       referrerId: session.user.id,
-      role: 'TEACHER'
+      role: { in: TEACHER_ROLES }
     },
     include: {
       _count: { select: { referrals: true } }

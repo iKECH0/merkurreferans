@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Users, GraduationCap, BookOpen, Wallet } from 'lucide-react';
 import PendingDeletionsClient from "./PendingDeletionsClient";
+import { TEACHER_ROLES } from "@/lib/roleConstants";
 
 export default async function AdminDashboard() {
   const pendingDeletions = await prisma.deletionRequest.findMany({
@@ -13,7 +14,7 @@ export default async function AdminDashboard() {
   });
 
   const totalTeachers = await prisma.user.count({
-    where: { role: { in: ['TEACHER', 'LEADER_TEACHER'] } }
+    where: { role: { in: TEACHER_ROLES } }
   });
   
   const totalLessons = await prisma.lesson.count();

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { GraduationCap, Presentation, ChevronRight, Sparkles, User, Lock, ArrowLeft } from 'lucide-react';
+import { isReferrerRole } from "@/lib/roleConstants";
 import "./login.css";
 
 export default function LoginPage() {
@@ -32,7 +33,7 @@ export default function LoginPage() {
         const session = await getSession();
         if (session?.user?.role === 'ADMIN') {
           router.push("/admin");
-        } else if (['REFERRER', 'TEACHER', 'LEADER_TEACHER', 'PARENT'].includes(session?.user?.role)) {
+        } else if (isReferrerRole(session?.user?.role)) {
           router.push("/referrer");
         } else {
           router.push("/student");

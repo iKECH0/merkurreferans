@@ -3,6 +3,7 @@ import NextTopLoader from 'nextjs-toploader';
 import "./globals.css";
 import "./responsive.css";
 import { Toaster } from 'react-hot-toast';
+import DomErrorHandler from '@/components/DomErrorHandler';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -34,13 +35,25 @@ export const metadata = {
   },
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+};
+
 export default function RootLayout({ children }) {
   return (
       <html
       lang="tr"
-      className={`${outfit.variable} h-full antialiased`}
+      className={`${outfit.variable} h-full antialiased notranslate`}
+      translate="no"
     >
-      <body className="min-h-full flex flex-col">
+      <head>
+        <meta name="google" content="notranslate" />
+      </head>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <DomErrorHandler />
         <NextTopLoader color="#06b6d4" height={3} showSpinner={false} />
         <main className="flex-1 flex flex-col">
           {children}

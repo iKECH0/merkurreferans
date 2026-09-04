@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import LessonManagerClient from "./LessonManagerClient";
+import { isReferrerRole } from "@/lib/roleConstants";
 
 export const metadata = {
   title: "Canlı Derslerim - Merkür Referans Platformu",
@@ -9,8 +10,7 @@ export const metadata = {
 
 export default async function LessonsPage() {
   const session = await auth();
-  const allowedRoles = ['REFERRER', 'TEACHER', 'LEADER_TEACHER', 'ADMIN'];
-  if (!session || !allowedRoles.includes(session.user.role)) {
+  if (!session || (!isReferrerRole(session.user.role) && session.user.role !== 'ADMIN')) {
     redirect("/login");
   }
 

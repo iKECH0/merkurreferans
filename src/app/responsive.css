@@ -39,9 +39,6 @@
   }
 
   /* Admin Panel */
-  .admin-layout { flex-direction: column; }
-  .admin-sidebar { width: 100%; min-height: auto; padding: 1rem; }
-  .admin-main { padding: 1rem; }
   .stats-grid { grid-template-columns: 1fr; }
   .students-table th, .students-table td { padding: 0.5rem; font-size: 0.85rem; }
 
