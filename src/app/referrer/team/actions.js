@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
+import { ROLE_OPTIONS_FOR_REFERRAL } from "@/lib/roleConstants";
 
 export async function addTeacherToTeam(formData) {
   const session = await auth();
@@ -14,7 +15,7 @@ export async function addTeacherToTeam(formData) {
   const referralCode = formData.get("referralCode");
   const rawRole = formData.get("role") || "TEACHER";
 
-  const allowedRoles = ["STUDENT", "TEACHER", "PARENT"];
+  const allowedRoles = ROLE_OPTIONS_FOR_REFERRAL.map(r => r.value);
   const role = allowedRoles.includes(rawRole) ? rawRole : "TEACHER";
 
   if (!name || !username || !password || !referralCode) {

@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { addTeacherToTeam } from "./actions";
 import toast from 'react-hot-toast';
 import { getUserLevel } from "@/lib/userLevels";
+import { ROLE_OPTIONS_FOR_REFERRAL } from "@/lib/roleConstants";
 
 export default function TeamClient({ initialTeam, allUsersForTree, currentUserId }) {
   const [isPending, startTransition] = useTransition();
@@ -185,9 +186,9 @@ export default function TeamClient({ initialTeam, allUsersForTree, currentUserId
             <div className="form-group">
               <label>Hesap Türü (Alt Grup)</label>
               <select className="input-field" value={role} onChange={e => setRole(e.target.value)} required style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }}>
-                <option value="TEACHER">👨‍🏫 Öğretmen</option>
-                <option value="STUDENT">🎓 Öğrenci</option>
-                <option value="PARENT">🏠 Veli</option>
+                {ROLE_OPTIONS_FOR_REFERRAL.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
             <button type="submit" className="btn-primary" disabled={isPending} style={{ marginTop: '1rem' }}>
