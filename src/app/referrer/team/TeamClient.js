@@ -12,6 +12,7 @@ export default function TeamClient({ initialTeam, allUsersForTree, currentUserId
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [role, setRole] = useState("TEACHER");
 
   const buildTree = (users, parentId) => {
     if (!users) return [];
@@ -67,6 +68,7 @@ export default function TeamClient({ initialTeam, allUsersForTree, currentUserId
     formData.append("username", username);
     formData.append("password", password);
     formData.append("referralCode", referralCode);
+    formData.append("role", role);
 
     startTransition(async () => {
       const res = await addTeacherToTeam(formData);
@@ -74,7 +76,7 @@ export default function TeamClient({ initialTeam, allUsersForTree, currentUserId
         toast.error(res.error);
       } else {
         toast.success("Referans başarıyla ekibine katıldı.");
-        setName(""); setUsername(""); setPassword(""); setReferralCode("");
+        setName(""); setUsername(""); setPassword(""); setReferralCode(""); setRole("TEACHER");
         setActiveTab("EKIP");
       }
     });
@@ -179,6 +181,14 @@ export default function TeamClient({ initialTeam, allUsersForTree, currentUserId
             <div className="form-group">
               <label>Referans Kodu (Örn: Merkür2026)</label>
               <input type="text" className="input-field" value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="Örn: Merkür2026" required />
+            </div>
+            <div className="form-group">
+              <label>Hesap Türü (Alt Grup)</label>
+              <select className="input-field" value={role} onChange={e => setRole(e.target.value)} required style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }}>
+                <option value="TEACHER">👨‍🏫 Öğretmen</option>
+                <option value="STUDENT">🎓 Öğrenci</option>
+                <option value="PARENT">🏠 Veli</option>
+              </select>
             </div>
             <button type="submit" className="btn-primary" disabled={isPending} style={{ marginTop: '1rem' }}>
               {isPending ? 'Ekleniyor...' : 'Referansı Kaydet'}

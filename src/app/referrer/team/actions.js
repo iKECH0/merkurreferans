@@ -12,6 +12,10 @@ export async function addTeacherToTeam(formData) {
   const username = formData.get("username");
   const password = formData.get("password");
   const referralCode = formData.get("referralCode");
+  const rawRole = formData.get("role") || "TEACHER";
+
+  const allowedRoles = ["STUDENT", "TEACHER", "PARENT"];
+  const role = allowedRoles.includes(rawRole) ? rawRole : "TEACHER";
 
   if (!name || !username || !password || !referralCode) {
     return { error: "Lütfen tüm alanları doldurun." };
@@ -32,7 +36,7 @@ export async function addTeacherToTeam(formData) {
         username,
         password: hashedPassword,
         referralCode,
-        role: "TEACHER",
+        role: role,
         referrerId: session.user.id, // Lider öğretmenin ID'si (Sponsor)
         isActive: true,
         wallet: {

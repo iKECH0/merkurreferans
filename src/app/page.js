@@ -21,6 +21,8 @@ export default function ReferansLandingPage() {
 
       {/* 2. HERO */}
       <section className="hero-min">
+        <div className="hero-glow-orb"></div>
+        <div className="hero-glow-orb-2"></div>
         <div className="hero-badge-min">
           <span className="dot"></span> Eğitim Platformu
         </div>
