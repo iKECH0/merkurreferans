@@ -1,25 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { handleSignOut } from "@/actions/authActions";
 
 export default function LogoutButton({ className, style, children, ...props }) {
   const [loading, setLoading] = useState(false);
 
-  const onClick = async (e) => {
+  const onClick = (e) => {
     e.preventDefault();
     if (loading) return;
     setLoading(true);
+
     try {
-      await handleSignOut();
-    } catch (error) {
-      // NEXT_REDIRECT is the expected behavior when a server action redirects
-      if (error?.message?.includes("NEXT_REDIRECT")) {
-        return;
-      }
-      // Fallback guaranteed redirect if network or other error occurs
-      window.location.href = "/login";
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (err) {
+      // ignore
     }
+
+    window.location.href = "/api/auth/logout";
   };
 
   return (

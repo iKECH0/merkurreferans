@@ -179,6 +179,7 @@ export default function RegisterPage() {
       <div className="falling-star star-4"></div>
 
       <div className="login-grid" style={{ gridTemplateColumns: '1fr', maxWidth: '500px', margin: '0 auto' }}>
+        <div className="login-form-section" style={{ width: '100%' }}>
           <Suspense fallback={
             <div className="login-box glass-panel" style={{ width: '100%', textAlign: 'center', padding: '3rem 1rem' }}>
               <p style={{ color: 'var(--text-muted)' }}>Sayfa yükleniyor...</p>
