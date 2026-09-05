@@ -16,7 +16,7 @@ import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
-const TARGET_URL = 'https://merkurreferans.com.tr';
+const TARGET_URL = 'https://www.merkurreferans.com.tr';
 
 export default function App() {
   const webViewRef = useRef(null);

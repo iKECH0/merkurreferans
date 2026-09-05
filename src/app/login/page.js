@@ -21,16 +21,27 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await signIn("credentials", {
+      const withTimeout = (promise, milliseconds) => Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("AUTH_TIMEOUT")), milliseconds);
+        })
+      ]);
+
+      const res = await withTimeout(signIn("credentials", {
         username: username.trim(),
         password: password.trim(),
         redirect: false,
-      });
+      }), 10000);
 
-      if (res?.error) {
+      if (!res?.ok || res?.error) {
         setError("Kullanıcı adı veya şifre hatalı.");
       } else {
-        const session = await getSession();
+        const session = await withTimeout(getSession(), 10000);
+        if (!session?.user?.role) {
+          throw new Error("SESSION_UNAVAILABLE");
+        }
+
         if (session?.user?.role === 'ADMIN') {
           router.push("/admin");
         } else if (isReferrerRole(session?.user?.role)) {
@@ -41,7 +52,9 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err) {
-      setError("Giriş yapılırken bir hata oluştu.");
+      setError(err?.message === "AUTH_TIMEOUT" || err?.message === "SESSION_UNAVAILABLE"
+        ? "Sunucu yanıt vermedi. İnternet bağlantınızı kontrol edip tekrar deneyin."
+        : "Giriş yapılırken bir hata oluştu.");
     } finally {
       setIsLoading(false);
     }
