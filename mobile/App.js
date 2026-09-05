@@ -21,9 +21,17 @@ const TARGET_URL = 'https://merkurreferans.com.tr';
 export default function App() {
   const webViewRef = useRef(null);
   const [canGoBack, setCanGoBack] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Güvenlik Zaman Aşımı: İlk açılışta en geç 3.5 sn sonra yükleme katmanını kesinlikle kaldır
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Android Geri Tuşu Kontrolü (WebView içinde geri gitme)
   useEffect(() => {
@@ -54,6 +62,7 @@ export default function App() {
   // Harici link yönlendirmeleri (tel, mailto, whatsapp, zoom vb.)
   const handleShouldStartLoadWithRequest = (request) => {
     const { url } = request;
+    if (!url) return true;
 
     // Telefon, mail, whatsapp, zoom protokolleri harici uygulamada açılsın
     if (
@@ -94,7 +103,7 @@ export default function App() {
               style={styles.retryButton}
               onPress={() => {
                 setHasError(false);
-                setIsLoading(true);
+                setIsInitialLoading(true);
                 webViewRef.current?.reload();
               }}
               activeOpacity={0.8}
@@ -108,29 +117,32 @@ export default function App() {
               ref={webViewRef}
               source={{ uri: TARGET_URL }}
               style={styles.webView}
+              originWhitelist={['*']}
               javaScriptEnabled={true}
               domStorageEnabled={true}
+              sharedCookiesEnabled={true}
+              thirdPartyCookiesEnabled={true}
               allowsInlineMediaPlayback={true}
               mediaPlaybackRequiresUserAction={false}
-              startInLoadingState={true}
+              startInLoadingState={false}
               pullToRefreshEnabled={true}
               bounces={true}
               mixedContentMode="compatibility"
+              textZoom={100}
+              setSupportMultipleWindows={false}
               onNavigationStateChange={(navState) => {
                 setCanGoBack(navState.canGoBack);
               }}
-              onLoadStart={() => {
-                setIsLoading(true);
-                setHasError(false);
-              }}
               onLoadEnd={() => {
-                setIsLoading(false);
+                setIsInitialLoading(false);
               }}
               onError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
                 console.warn('WebView error: ', nativeEvent);
-                setHasError(true);
-                setIsLoading(false);
+                if (isInitialLoading) {
+                  setHasError(true);
+                }
+                setIsInitialLoading(false);
               }}
               onHttpError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
@@ -141,9 +153,9 @@ export default function App() {
               onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
             />
 
-            {/* Yükleniyor Göstergesi */}
-            {isLoading && (
-              <View style={styles.loadingOverlay}>
+            {/* Sadece İlk Açılış Yükleniyor Göstergesi */}
+            {isInitialLoading && (
+              <View style={styles.loadingOverlay} pointerEvents="none">
                 <ActivityIndicator size="large" color="#10b981" />
                 <Text style={styles.loadingText}>Yükleniyor...</Text>
               </View>
