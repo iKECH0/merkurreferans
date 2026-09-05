@@ -17,7 +17,7 @@ export default function StudentListClient({ initialStudents }) {
   );
 
   const handleDelete = async (id, name) => {
-    const confirmed = await customConfirm(`${name} adlı öğrenciyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm verileri silinir.`);
+    const confirmed = await customConfirm(`${name} adlı kişiyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm verileri silinir.`);
     if (confirmed) {
       startTransition(async () => {
         const res = await deleteStudent(id);
