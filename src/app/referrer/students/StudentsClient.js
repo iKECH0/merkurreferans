@@ -162,11 +162,11 @@ export default function StudentsClient({ students, currentUserId }) {
               </div>
               <div className="form-group">
                 <label>Eğitim Paketi (Ay)</label>
-                <select className="input-field" value={requestedMonths} onChange={e => setRequestedMonths(e.target.value)} style={{ color: 'black' }}>
-                  <option value="1">1 Ay</option>
-                  <option value="3">3 Ay</option>
-                  <option value="6">6 Ay</option>
-                  <option value="12">12 Ay</option>
+                <select className="input-field" value={requestedMonths} onChange={e => setRequestedMonths(e.target.value)} style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>
+                  <option value="1" style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>1 Ay</option>
+                  <option value="3" style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>3 Ay</option>
+                  <option value="6" style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>6 Ay</option>
+                  <option value="12" style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>12 Ay</option>
                 </select>
               </div>
               <button type="submit" className="btn-primary" disabled={isPending} style={{ marginTop: '1rem' }}>

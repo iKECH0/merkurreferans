@@ -5,7 +5,7 @@ import { Users, Hourglass, Banknote, Copy, ArrowRight, Video, GraduationCap, Awa
 import { getUserLevel, ALL_LEVELS_INFO } from '@/lib/userLevels';
 
 export const metadata = {
-  title: "Referans Paneli | MERKÜR REFERANS",
+  title: "Profesyonel Öğretmen Paneli | MERKÜR YÖRÜNGE",
 };
 
 export default async function ReferrerDashboard() {

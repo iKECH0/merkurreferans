@@ -136,15 +136,27 @@ export default function StudentLessonsClient({ lessons }) {
                     style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem", width: "100%", textDecoration: "none", padding: "0.9rem", background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', borderRadius: '14px', fontWeight: '700', fontSize: '1rem', boxShadow: '0 8px 20px -8px rgba(16, 185, 129, 0.6)', border: '1px solid rgba(16, 185, 129, 0.8)' }}
                   >
                     <PlayCircle size={20} />
-                    Derse Katıl
+                    Derse Katıl (Canlı)
                   </a>
               ) : lesson.status === "SCHEDULED" ? (
-                  <button
-                    disabled
-                    style={{ width: "100%", padding: "0.9rem", opacity: 0.6, cursor: "not-allowed", background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '14px', fontWeight: '600', display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
-                  >
-                    <Clock size={18} /> Ders Saati Bekleniyor
-                  </button>
+                  lesson.zoomLink ? (
+                    <a
+                      href={lesson.zoomLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem", width: "100%", textDecoration: "none", padding: "0.9rem", background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: '#fff', borderRadius: '14px', fontWeight: '700', fontSize: '1rem', boxShadow: '0 8px 20px -8px rgba(59, 130, 246, 0.6)' }}
+                    >
+                      <Video size={20} />
+                      Derse Katıl (Zoom Linki)
+                    </a>
+                  ) : (
+                    <button
+                      disabled
+                      style={{ width: "100%", padding: "0.9rem", opacity: 0.6, cursor: "not-allowed", background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '14px', fontWeight: '600', display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
+                    >
+                      <Clock size={18} /> Ders Saati Bekleniyor
+                    </button>
+                  )
               ) : (
                   <button
                     disabled

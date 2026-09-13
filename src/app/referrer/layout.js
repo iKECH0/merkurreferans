@@ -31,8 +31,8 @@ export default async function ReferrerLayout({ children }) {
     <div className="admin-container">
       <aside className="admin-sidebar glass-panel">
         <div className="sidebar-header">
-          <h2>MERKÜR REFERANS</h2>
-          <span className="badge" style={{ background: '#10b981' }}>Referans</span>
+          <h2>MERKÜR YÖRÜNGE</h2>
+          <span className="badge" style={{ background: '#10b981' }}>Profesyonel Öğretmen</span>
         </div>
         
         <nav className="sidebar-nav">
@@ -106,7 +106,7 @@ export default async function ReferrerLayout({ children }) {
             </div>
             <div>
               <h1 style={{ fontSize: '1.05rem', color: '#fff', margin: 0, fontWeight: '700', lineHeight: 1.2 }}>
-                Referans Paneli
+                Profesyonel Öğretmen Paneli
               </h1>
               <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600' }}>
                 @{session.user.username}

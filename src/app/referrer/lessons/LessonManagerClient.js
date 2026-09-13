@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { createLesson, completeLesson } from "./actions";
-import { Video, Play, CheckCircle, Zap, Calendar, Radio } from "lucide-react";
+import { Video, Play, CheckCircle, Zap, Calendar, Radio, Copy } from "lucide-react";
 import toast from 'react-hot-toast';
 import { customConfirm } from "@/lib/toastHelpers";
 
@@ -20,6 +20,12 @@ export default function LessonManagerClient({ lessons, students }) {
     return now >= fifteenMinsBefore && now <= end;
   };
 
+  const copyToClipboard = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success("Zoom linki panoya kopyalandı!");
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -35,6 +41,12 @@ export default function LessonManagerClient({ lessons, students }) {
       const startD = new Date(year, now.getMonth(), quickDay === "tomorrow" ? now.getDate() + 1 : now.getDate(), parseInt(startH), parseInt(startM));
       const endD = new Date(year, now.getMonth(), quickDay === "tomorrow" ? now.getDate() + 1 : now.getDate(), parseInt(endH), parseInt(endM));
       
+      if (startD < new Date(now.getTime() - 5 * 60000)) {
+        toast.error("Geçmiş bir zaman için ders planlayamazsınız.");
+        setLoading(false);
+        return;
+      }
+
       if (endD <= startD) {
         toast.error("Bitiş saati başlangıç saatinden sonra olmalıdır.");
         setLoading(false);
@@ -50,6 +62,12 @@ export default function LessonManagerClient({ lessons, students }) {
       const startD = new Date(startVal);
       const endD = new Date(endVal);
       
+      if (startD < new Date(Date.now() - 5 * 60000)) {
+        toast.error("Geçmiş bir zaman için ders planlayamazsınız.");
+        setLoading(false);
+        return;
+      }
+
       if (endD <= startD) {
         toast.error("Bitiş saati başlangıç saatinden sonra olmalıdır.");
         setLoading(false);
@@ -66,7 +84,7 @@ export default function LessonManagerClient({ lessons, students }) {
     if (res.error) {
       toast.error(res.error);
     } else {
-      toast.success("Ders başarıyla planlandı. Zoom linki oluşturuldu!");
+      toast.success("Ders başarıyla planlandı. Zoom linki hazır!");
       e.target.reset();
     }
   };
@@ -102,10 +120,10 @@ export default function LessonManagerClient({ lessons, students }) {
 
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontWeight: 'bold' }}>Öğrenci Seçin</label>
-            <select name="studentId" className="input-field" required>
+            <select name="studentId" className="input-field" required style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>
               <option value="">-- Öğrenci Seç --</option>
               {students.map(s => (
-                <option key={s.id} value={s.id}>{s.name || s.username} ({s.referrerId === s.myId ? 'Benim Öğrencim' : 'Kurum Öğrencisi'})</option>
+                <option key={s.id} value={s.id} style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>{s.name || s.username} ({s.referrerId === s.myId ? 'Benim Öğrencim' : 'Kurum Öğrencisi'})</option>
               ))}
             </select>
           </div>
@@ -187,6 +205,7 @@ export default function LessonManagerClient({ lessons, students }) {
             <tbody>
               {lessons.map(lesson => {
                 const isActive = lesson.status === 'SCHEDULED' && isLessonActive(lesson.startTime, lesson.endTime);
+                const zoomTargetLink = lesson.zoomStartLink || lesson.zoomLink;
                 
                 return (
                   <tr key={lesson.id}>
@@ -197,20 +216,50 @@ export default function LessonManagerClient({ lessons, students }) {
                     </td>
                     <td>{lesson.price} ₺</td>
                     <td>
-                      {lesson.zoomStartLink ? (
-                        isActive ? (
-                          <a href={lesson.zoomStartLink} target="_blank" rel="noreferrer" style={{ color: '#10b981', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'bold' }}>
-                            <Radio size={16} style={{ animation: 'pulse-icon 1.5s ease-in-out infinite' }} /> Derse Katıl
+                      {zoomTargetLink ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <a 
+                            href={zoomTargetLink} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            style={{ 
+                              color: isActive ? '#10b981' : '#3b82f6', 
+                              textDecoration: 'none', 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '0.3rem', 
+                              fontWeight: 'bold',
+                              background: isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                              padding: '0.3rem 0.6rem',
+                              borderRadius: '8px',
+                              border: isActive ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {isActive ? <Radio size={14} style={{ animation: 'pulse-icon 1.5s ease-in-out infinite' }} /> : <Video size={14} />}
+                            {isActive ? 'Derse Başlat (Canlı)' : 'Derse Başlat'}
                           </a>
-                        ) : lesson.status === 'COMPLETED' ? (
-                          <span style={{ color: 'var(--text-muted)' }}>-</span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>Ders Vakti Bekleniyor</span>
-                        )
-                      ) : lesson.zoomLink ? (
-                        <a href={lesson.zoomLink} target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'bold' }}>
-                          <Video size={16} /> Zoom Linki
-                        </a>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(lesson.zoomLink || lesson.zoomStartLink)}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '8px',
+                              padding: '0.3rem 0.6rem',
+                              color: 'var(--text-main)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              fontSize: '0.8rem',
+                              fontWeight: '500'
+                            }}
+                            title="Öğrenci Zoom Linkini Kopyala"
+                          >
+                            <Copy size={13} /> Linki Kopyala
+                          </button>
+                        </div>
                       ) : '-'}
                     </td>
                     <td>

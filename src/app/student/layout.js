@@ -2,7 +2,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import LogoutButton from '@/components/LogoutButton';
-import { Home, Video, LogOut } from 'lucide-react';
+import { Home, Video, LogOut, FileSpreadsheet } from 'lucide-react';
 import '../admin/admin.css';
 
 export default async function StudentLayout({ children }) {
@@ -12,11 +12,13 @@ export default async function StudentLayout({ children }) {
     redirect('/login');
   }
 
+  const excelUrl = "https://docs.google.com/spreadsheets/d/1IvC7Kme6lZugdHtaQJTsNZ-sYhhYBPEBW5HkEkVmqT0/edit?gid=2037362416#gid=2037362416";
+
   return (
     <div className="admin-container">
       <aside className="admin-sidebar glass-panel">
         <div className="sidebar-header">
-          <h2>MERKÜR REFERANS</h2>
+          <h2>MERKÜR YÖRÜNGE</h2>
           <span className="badge" style={{ background: '#3b82f6' }}>Öğrenci</span>
         </div>
         
@@ -29,6 +31,10 @@ export default async function StudentLayout({ children }) {
             <Video className="nav-icon" size={20} />
             <span className="nav-text">Canlı Dersler</span>
           </Link>
+          <a href={excelUrl} target="_blank" rel="noopener noreferrer" className="nav-item">
+            <FileSpreadsheet className="nav-icon" size={20} style={{ color: '#10b981' }} />
+            <span className="nav-text" style={{ color: '#10b981', fontWeight: '600' }}>Danışmanlık Tablosu</span>
+          </a>
         </nav>
 
         <div className="sidebar-footer">

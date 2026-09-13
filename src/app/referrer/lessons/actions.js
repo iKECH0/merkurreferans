@@ -70,94 +70,104 @@ export async function createLesson(formData) {
   }
 }
 
+export async function executeLessonCompletion(lessonId) {
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { teacher: true, student: true }
+  });
+
+  if (!lesson) {
+    return { error: "Geçersiz ders." };
+  }
+  
+  if (lesson.status === "COMPLETED") {
+    return { error: "Bu ders zaten tamamlanmış." };
+  }
+
+  let settings = await prisma.settings.findUnique({ where: { id: "GLOBAL" } });
+  if (!settings) {
+    settings = await prisma.settings.create({ data: { id: "GLOBAL" } });
+  }
+
+  // Komisyon Hesaplama (Senaryo A vs Senaryo B)
+  const isMyStudent = lesson.student?.referrerId === lesson.teacherId;
+  
+  const teacherSharePercent = isMyStudent 
+    ? settings.lessonTeacherShareB // %65
+    : settings.lessonTeacherShareA; // %50
+
+  const teacherCommission = lesson.price * (teacherSharePercent / 100);
+
+  // Öğretmene Cüzdan İşlemi
+  let teacherWallet = await prisma.wallet.findUnique({ where: { userId: lesson.teacherId } });
+  if (!teacherWallet) {
+    teacherWallet = await prisma.wallet.create({ data: { userId: lesson.teacherId } });
+  }
+
+  await prisma.wallet.update({
+    where: { id: teacherWallet.id },
+    data: { balance: { increment: teacherCommission } }
+  });
+
+  await prisma.walletTransaction.create({
+    data: {
+      walletId: teacherWallet.id,
+      amount: teacherCommission,
+      type: "EARNED",
+      description: `Ders Ücreti (${isMyStudent ? 'Senaryo B' : 'Senaryo A'}) - ${lesson.title}`
+    }
+  });
+
+  // Lider Öğretmen (Pasif Pay)
+  if (lesson.teacher?.referrerId) {
+    const leaderCommission = lesson.price * (settings.leaderTeacherShare / 100);
+    if (leaderCommission > 0) {
+      let leaderWallet = await prisma.wallet.findUnique({ where: { userId: lesson.teacher.referrerId } });
+      if (!leaderWallet) {
+        leaderWallet = await prisma.wallet.create({ data: { userId: lesson.teacher.referrerId } });
+      }
+      await prisma.wallet.update({
+        where: { id: leaderWallet.id },
+        data: { balance: { increment: leaderCommission } }
+      });
+      await prisma.walletTransaction.create({
+        data: {
+          walletId: leaderWallet.id,
+          amount: leaderCommission,
+          type: "EARNED",
+          description: `Ekip Ders Primi (Referans: ${lesson.teacher.name || lesson.teacher.username}) - ${lesson.title}`
+        }
+      });
+    }
+  }
+
+  // Dersi tamamlandı olarak işaretle
+  await prisma.lesson.update({
+    where: { id: lessonId },
+    data: { status: "COMPLETED" }
+  });
+
+  revalidatePath("/referrer/lessons");
+  revalidatePath("/referrer/commissions");
+  revalidatePath("/student/lessons");
+  revalidatePath("/student");
+  return { success: true };
+}
+
 export async function completeLesson(lessonId) {
   const session = await auth();
   if (!session) return { error: "Yetkisiz" };
 
   try {
     const lesson = await prisma.lesson.findUnique({
-      where: { id: lessonId },
-      include: { teacher: true, student: true }
+      where: { id: lessonId }
     });
 
     if (!lesson || lesson.teacherId !== session.user.id) {
       return { error: "Geçersiz ders." };
     }
-    
-    if (lesson.status === "COMPLETED") {
-      return { error: "Bu ders zaten tamamlanmış." };
-    }
 
-    let settings = await prisma.settings.findUnique({ where: { id: "GLOBAL" } });
-    if (!settings) {
-      settings = await prisma.settings.create({ data: { id: "GLOBAL" } });
-    }
-
-    // Komisyon Hesaplama (Senaryo A vs Senaryo B)
-    // Eğer öğrencinin referrerId'si bu derse giren öğretmense = Senaryo B (Kendi öğrencisi)
-    // Eğer farklıysa (veya yoksa) = Senaryo A (Kurum/Başkası getirdi)
-    const isMyStudent = lesson.student.referrerId === lesson.teacherId;
-    
-    const teacherSharePercent = isMyStudent 
-      ? settings.lessonTeacherShareB // %65
-      : settings.lessonTeacherShareA; // %50
-
-    const teacherCommission = lesson.price * (teacherSharePercent / 100);
-
-    // Öğretmene Cüzdan İşlemi
-    let teacherWallet = await prisma.wallet.findUnique({ where: { userId: lesson.teacherId } });
-    if (!teacherWallet) {
-      teacherWallet = await prisma.wallet.create({ data: { userId: lesson.teacherId } });
-    }
-
-    await prisma.wallet.update({
-      where: { id: teacherWallet.id },
-      data: { balance: { increment: teacherCommission } }
-    });
-
-    await prisma.walletTransaction.create({
-      data: {
-        walletId: teacherWallet.id,
-        amount: teacherCommission,
-        type: "EARNED",
-        description: `Ders Ücreti (${isMyStudent ? 'Senaryo B' : 'Senaryo A'}) - ${lesson.title}`
-      }
-    });
-
-    // Lider Öğretmen (Pasif Pay)
-    if (lesson.teacher.referrerId) {
-      const leaderCommission = lesson.price * (settings.leaderTeacherShare / 100);
-      if (leaderCommission > 0) {
-        let leaderWallet = await prisma.wallet.findUnique({ where: { userId: lesson.teacher.referrerId } });
-        if (!leaderWallet) {
-          leaderWallet = await prisma.wallet.create({ data: { userId: lesson.teacher.referrerId } });
-        }
-        await prisma.wallet.update({
-          where: { id: leaderWallet.id },
-          data: { balance: { increment: leaderCommission } }
-        });
-        await prisma.walletTransaction.create({
-          data: {
-            walletId: leaderWallet.id,
-            amount: leaderCommission,
-            type: "EARNED",
-            description: `Ekip Ders Primi (Referans: ${lesson.teacher.name}) - ${lesson.title}`
-          }
-        });
-      }
-    }
-
-    // Dersi tamamlandı olarak işaretle
-    await prisma.lesson.update({
-      where: { id: lessonId },
-      data: { status: "COMPLETED" }
-    });
-
-    revalidatePath("/referrer/lessons");
-    revalidatePath("/referrer/commissions");
-    revalidatePath("/student/lessons");
-    revalidatePath("/student");
-    return { success: true };
+    return await executeLessonCompletion(lessonId);
   } catch (err) {
     console.error("Complete Lesson Error", err);
     return { error: "Ders tamamlanırken hata oluştu." };

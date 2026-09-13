@@ -180,6 +180,11 @@ body {
   background: rgba(15, 23, 42, 0.9);
 }
 
+select.input-field option {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
 /* Modal Enhancements */
 .modal-overlay {
   position: fixed;

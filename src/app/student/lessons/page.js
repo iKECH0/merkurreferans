@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import StudentLessonsClient from "./StudentLessonsClient";
+import { executeLessonCompletion } from "@/app/referrer/lessons/actions";
 
 export const metadata = {
   title: "Canlı Derslerim | Öğrenci Paneli",
@@ -21,16 +22,20 @@ export default async function StudentLessonsPage() {
     redirect("/student");
   }
 
-  // Auto-complete past scheduled lessons
+  // Auto-complete past scheduled lessons safely with commission payouts
   const now = new Date();
-  await prisma.lesson.updateMany({
+  const expiredLessons = await prisma.lesson.findMany({
     where: {
       studentId: session.user.id,
       status: 'SCHEDULED',
       endTime: { lt: now }
     },
-    data: { status: 'COMPLETED' }
+    select: { id: true }
   });
+
+  for (const exp of expiredLessons) {
+    await executeLessonCompletion(exp.id);
+  }
 
   const lessons = await prisma.lesson.findMany({
     where: { studentId: session.user.id },
