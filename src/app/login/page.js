@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, Presentation, ChevronRight, Sparkles, User, Lock, ArrowLeft } from 'lucide-react';
+import { Users, ShieldCheck, ChevronRight, Sparkles, User, Lock, ArrowLeft } from 'lucide-react';
 import { isReferrerRole } from "@/lib/roleConstants";
 import "./login.css";
 
 export default function LoginPage() {
-  const [selectedPortal, setSelectedPortal] = useState(null); // 'student' | 'teacher' | null
+  const [selectedPortal, setSelectedPortal] = useState(null); // 'teacher' | 'admin' | null
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -67,26 +67,26 @@ export default function LoginPage() {
           0%, 100% { transform: translateY(0) scale(1); opacity: 0.05; }
           50% { transform: translateY(-20px) scale(1.1); opacity: 0.1; }
         }
-        @keyframes portalPulse {
-          0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
-          70% { box-shadow: 0 0 0 15px rgba(56, 189, 248, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
-        }
         @keyframes teacherPulse {
           0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
           70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
           100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
-        .student-portal-btn:hover .portal-icon {
-          animation: portalPulse 1.5s infinite;
+        @keyframes adminPulse {
+          0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+          70% { box-shadow: 0 0 0 15px rgba(168, 85, 247, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
         }
         .teacher-portal-btn:hover .portal-icon {
           animation: teacherPulse 1.5s infinite;
         }
+        .admin-portal-btn:hover .portal-icon {
+          animation: adminPulse 1.5s infinite;
+        }
       `}} />
       {/* Subtle Background Glows */}
-      <div style={{ position: 'absolute', top: '10%', left: '10%', width: '300px', height: '300px', background: 'rgba(56, 189, 248, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none', animation: 'floatGlow 8s ease-in-out infinite' }}></div>
-      <div style={{ position: 'absolute', bottom: '10%', right: '10%', width: '300px', height: '300px', background: 'rgba(16, 185, 129, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none', animation: 'floatGlow 8s ease-in-out infinite reverse' }}></div>
+      <div style={{ position: 'absolute', top: '10%', left: '10%', width: '300px', height: '300px', background: 'rgba(16, 185, 129, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none', animation: 'floatGlow 8s ease-in-out infinite' }}></div>
+      <div style={{ position: 'absolute', bottom: '10%', right: '10%', width: '300px', height: '300px', background: 'rgba(168, 85, 247, 0.05)', filter: 'blur(100px)', borderRadius: '50%', pointerEvents: 'none', animation: 'floatGlow 8s ease-in-out infinite reverse' }}></div>
 
       <div style={{ zIndex: 1, width: '100%', maxWidth: '500px', padding: '2rem' }}>
         
@@ -106,27 +106,7 @@ export default function LoginPage() {
 
         {!selectedPortal ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-            {/* Student Portal Button */}
-            <button 
-              className="student-portal-btn"
-              onClick={() => setSelectedPortal('student')}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '24px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'left' }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)'; e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <div className="portal-icon" style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(56, 189, 248, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-                  <GraduationCap size={28} />
-                </div>
-                <div>
-                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Öğrenci Portalı</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Canlı derslerinize katılın ve gelişiminizi takip edin.</p>
-                </div>
-              </div>
-              <ChevronRight color="#64748b" />
-            </button>
-
-            {/* Teacher/Referrer Portal Button */}
+            {/* Teacher / Parent Portal Button */}
             <button 
               className="teacher-portal-btn"
               onClick={() => setSelectedPortal('teacher')}
@@ -136,11 +116,31 @@ export default function LoginPage() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                 <div className="portal-icon" style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
-                  <Presentation size={28} />
+                  <Users size={28} />
                 </div>
                 <div>
-                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Öğretmen / Eğitmen Portalı</h3>
+                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Veli / Öğretmen Girişi</h3>
                   <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Ağınızı yönetin, ders verin ve komisyonlarınızı izleyin.</p>
+                </div>
+              </div>
+              <ChevronRight color="#64748b" />
+            </button>
+
+            {/* Admin Portal Button */}
+            <button 
+              className="admin-portal-btn"
+              onClick={() => setSelectedPortal('admin')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '24px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'left' }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)'; e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.6)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div className="portal-icon" style={{ width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(168, 85, 247, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                  <ShieldCheck size={28} />
+                </div>
+                <div>
+                  <h3 style={{ color: '#f8fafc', fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.3rem' }}>Yönetici Girişi</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Sistem ayarları, kullanıcı onayları ve yönetim paneli.</p>
                 </div>
               </div>
               <ChevronRight color="#64748b" />
@@ -155,9 +155,9 @@ export default function LoginPage() {
               <ArrowLeft size={18} /> Profil Seçimine Dön
             </button>
             
-            <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: `1px solid ${selectedPortal === 'student' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`, borderRadius: '24px', padding: '2.5rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+            <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: `1px solid ${selectedPortal === 'admin' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`, borderRadius: '24px', padding: '2.5rem', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
               <h2 style={{ fontSize: '1.5rem', color: '#f8fafc', marginBottom: '2rem', textAlign: 'center' }}>
-                {selectedPortal === 'student' ? 'Öğrenci Girişi' : 'Öğretmen / Eğitmen Girişi'}
+                {selectedPortal === 'admin' ? 'Yönetici Girişi' : 'Veli / Öğretmen Girişi'}
               </h2>
 
               {error && <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', textAlign: 'center', fontSize: '0.95rem' }}>{error}</div>}
@@ -176,7 +176,7 @@ export default function LoginPage() {
                       placeholder="Kullanıcı adınızı girin"
                       required
                       style={{ width: '100%', padding: '1rem 1rem 1rem 3rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', color: '#f8fafc', fontSize: '1rem', outline: 'none', transition: 'border-color 0.3s' }}
-                      onFocus={(e) => e.target.style.borderColor = selectedPortal === 'student' ? '#38bdf8' : '#10b981'}
+                      onFocus={(e) => e.target.style.borderColor = selectedPortal === 'admin' ? '#a855f7' : '#10b981'}
                       onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                     />
                   </div>
@@ -195,7 +195,7 @@ export default function LoginPage() {
                       placeholder="••••••••"
                       required
                       style={{ width: '100%', padding: '1rem 1rem 1rem 3rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', color: '#f8fafc', fontSize: '1rem', outline: 'none', transition: 'border-color 0.3s' }}
-                      onFocus={(e) => e.target.style.borderColor = selectedPortal === 'student' ? '#38bdf8' : '#10b981'}
+                      onFocus={(e) => e.target.style.borderColor = selectedPortal === 'admin' ? '#a855f7' : '#10b981'}
                       onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                     />
                   </div>
@@ -204,7 +204,7 @@ export default function LoginPage() {
                 <button 
                   type="submit" 
                   disabled={isLoading}
-                  style={{ width: '100%', padding: '1rem', marginTop: '1rem', background: selectedPortal === 'student' ? 'linear-gradient(to right, #0284c7, #38bdf8)' : 'linear-gradient(to right, #059669, #10b981)', color: '#fff', border: 'none', borderRadius: '16px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.2s, opacity 0.2s', opacity: isLoading ? 0.7 : 1 }}
+                  style={{ width: '100%', padding: '1rem', marginTop: '1rem', background: selectedPortal === 'admin' ? 'linear-gradient(to right, #7c3aed, #a855f7)' : 'linear-gradient(to right, #059669, #10b981)', color: '#fff', border: 'none', borderRadius: '16px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.2s, opacity 0.2s', opacity: isLoading ? 0.7 : 1 }}
                   onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                   onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                 >

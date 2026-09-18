@@ -24,12 +24,12 @@ export default function ReferansLandingPage() {
         <div className="hero-glow-orb"></div>
         <div className="hero-glow-orb-2"></div>
         <div className="hero-badge-min">
-          <span className="dot"></span> Eğitim Platformu
+          <span className="dot"></span> Yeni Nesil Eğitim Platformu
         </div>
         
         <h1 className="hero-title-min">
-          Eğitimin Yeni<br />
-          Referans Noktası
+          Yeni Nesil<br />
+          Eğitim Platformu
         </h1>
         
         <p className="hero-desc-min">
