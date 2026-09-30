@@ -37,11 +37,10 @@ export default function ReferansLandingPage() {
         </p>
 
         <Link href="/register" className="hero-cta-min">
-          Ücretsiz Başlayın <ArrowRight size={20} />
+          Hemen Başlayın <ArrowRight size={20} />
         </Link>
 
         <div className="hero-trust-min">
-          <span><CheckCircle2 size={16} color="#10b981" /> Ücretsiz</span>
           <span><CheckCircle2 size={16} color="#10b981" /> Anında Kurulum</span>
           <span><CheckCircle2 size={16} color="#10b981" /> KVKK Uyumlu</span>
         </div>
