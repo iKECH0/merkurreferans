@@ -1,6 +1,7 @@
 "use server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { getScenarioForReferrerRole } from "@/lib/revenueScenarios";
 
 export async function registerStudent(formData) {
   const name = formData.get("name");
@@ -33,12 +34,16 @@ export async function registerStudent(formData) {
 
   // Handle Referral Code
   let referrerId = null;
+  let referrerRoleAtJoin = null;
+  let referralScenario = "A";
   if (referralCode) {
     const referrer = await prisma.user.findUnique({
       where: { referralCode }
     });
     if (referrer) {
       referrerId = referrer.id;
+      referrerRoleAtJoin = referrer.role;
+      referralScenario = getScenarioForReferrerRole(referrer.role);
     }
   }
 
@@ -59,6 +64,8 @@ export async function registerStudent(formData) {
         role: "STUDENT",
         isActive: false, // Admin onayı gerektirir
         referrerId,
+        referrerRoleAtJoin,
+        referralScenario,
         referralCode: myReferralCode,
         requestedMonths,
         wallet: {

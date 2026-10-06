@@ -23,6 +23,8 @@ model User {
   // Referral System
   referralCode       String?      @unique
   referrerId         String?
+  referralScenario   String?      // A, B, C veya D; kayıt anında sabitlenir
+  referrerRoleAtJoin String?      // Referansı yapan kişinin kayıt anındaki rolü
   ibanDetails        String?      @db.Text
   referrer           User?        @relation("ReferralTree", fields: [referrerId], references: [id])
   referrals          User[]       @relation("ReferralTree")
@@ -103,6 +105,21 @@ model Commission {
   user       User    @relation("CommissionsEarned", fields: [userId], references: [id], onDelete: Cascade)
   sourceUser User    @relation("CommissionsSourced", fields: [sourceUserId], references: [id], onDelete: Cascade)
   lesson     Lesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+}
+
+model InstitutionRevenue {
+  id           String   @id @default(cuid())
+  sourceUserId String
+  lessonId     String?
+  scenario     String
+  amount       Float
+  type         String   // LESSON veya SUBSCRIPTION
+  description  String?
+  createdAt    DateTime @default(now())
+
+  @@index([sourceUserId])
+  @@index([lessonId])
+  @@index([createdAt])
 }
 
 model DeletionRequest {

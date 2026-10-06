@@ -24,6 +24,13 @@ async function creditRevenueShare({ userId, sourceUserId, lesson, amount, descri
   });
 }
 
+async function recordInstitutionRevenue({ sourceUserId, lessonId, scenario, amount, type, description }) {
+  if (amount <= 0) return;
+  await prisma.institutionRevenue.create({
+    data: { sourceUserId, lessonId, scenario, amount, type, description }
+  });
+}
+
 export async function createLesson(formData) {
   const session = await auth();
   if (!session) return { error: "Yetkisiz" };
@@ -132,6 +139,19 @@ export async function executeLessonCompletion(lessonId) {
       description: `Referans Payı (Senaryo ${scenario} / ${shares[referralParticipant]}%) - ${lesson.title}`
     });
   }
+
+  const referralSharePaid = referralParticipant && lesson.student.referrerId
+    ? shares[referralParticipant]
+    : 0;
+  const institutionPercent = shares.institution + shares.parent + shares.student - referralSharePaid;
+  await recordInstitutionRevenue({
+    sourceUserId: lesson.studentId,
+    lessonId: lesson.id,
+    scenario,
+    amount: lesson.price * (institutionPercent / 100),
+    type: "LESSON",
+    description: `Kurum ders payı (Senaryo ${scenario} / ${institutionPercent}%) - ${lesson.title}`
+  });
 
   // Dersi tamamlandı olarak işaretle
   await prisma.lesson.update({

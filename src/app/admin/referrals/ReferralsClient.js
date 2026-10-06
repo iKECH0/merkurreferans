@@ -162,6 +162,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                 <th>Referans Adı</th>
                 <th>Kullanıcı Adı</th>
                 <th>Referans Kodu</th>
+                <th>Gelir Senaryosu</th>
                 <th>👤 Öğrenci Sayısı</th>
                 <th>Toplam Kazanç</th>
                 <th>Banka / IBAN</th>
@@ -191,6 +192,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                     </td>
                     <td>{referrer.username}</td>
                     <td style={{ fontWeight: 'bold', color: '#10b981' }}>{referrer.referralCode}</td>
+                    <td><span style={{ padding: '0.2rem 0.55rem', borderRadius: '8px', background: 'rgba(56,189,248,0.12)', color: '#38bdf8', fontWeight: 700 }}>Senaryo {referrer.referralScenario || 'A'}</span></td>
                     <td style={{ fontWeight: 'bold', color: isTop ? '#fbbf24' : 'inherit' }}>{referrer.referrals.length}</td>
                     <td>₺{totalEarned}</td>
                     <td>
@@ -231,7 +233,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
                   {/* EXPANDED NETWORK ROW */}
                   {expandedId === referrer.id && (
                     <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
-                      <td colSpan="8" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
+                      <td colSpan="9" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
                         <h4 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>{referrer.name} Ağ Detayı</h4>
                         {referrer.referrals.length === 0 ? (
                           <p style={{ color: 'var(--text-muted)' }}>Bu kullanıcının altında kimse yok.</p>
@@ -274,7 +276,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
               })}
               {initialReferrers.length === 0 && (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>Henüz kayıtlı referans yok.</td>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>Henüz kayıtlı referans yok.</td>
                 </tr>
               )}
             </tbody>

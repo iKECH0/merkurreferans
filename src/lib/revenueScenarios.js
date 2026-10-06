@@ -57,9 +57,19 @@ export function normalizeScenarioShares(value, legacySettings = {}) {
 }
 
 export function getRevenueScenario(student, teacherId) {
+  if (["A", "B", "C", "D"].includes(student?.referralScenario)) return student.referralScenario;
   if (!student?.referrerId) return "A";
-  if (student.referrerId === teacherId) return "B";
-  if (student.referrer?.role === "PARENT") return "C";
-  if (student.referrer?.role === "STUDENT") return "D";
+  if (student.referrerId === teacherId || isTeacherReferralRole(student.referrerRoleAtJoin || student.referrer?.role)) return "B";
+  return getScenarioForReferrerRole(student.referrerRoleAtJoin || student.referrer?.role);
+}
+
+export function isTeacherReferralRole(role) {
+  return TEACHER_ROLES.includes(role);
+}
+
+export function getScenarioForReferrerRole(role) {
+  if (isTeacherReferralRole(role)) return "B";
+  if (role === "PARENT") return "C";
+  if (role === "STUDENT") return "D";
   return "A";
 }

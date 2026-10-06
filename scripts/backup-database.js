@@ -10,19 +10,24 @@ function timestamp() {
 }
 
 async function main() {
-  // Raw SELECTs keep the backup usable even immediately before a Prisma schema migration.
-  // The per-run SQL tag also prevents pooled PostgreSQL connections from reusing a
-  // stale SELECT * plan after a column is added.
+  // Discover every public table so future models are included automatically.
+  // Raw SELECTs keep the backup usable immediately before Prisma schema migrations.
   const queryTag = `backup_${Date.now()}`;
-  const [users, wallets, walletTransactions, lessons, settings, commissions, deletionRequests] = await prisma.$transaction([
-    prisma.$queryRawUnsafe(`SELECT * FROM "User" ORDER BY "createdAt" ASC /* ${queryTag}_users */`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "Wallet" ORDER BY "updatedAt" ASC /* ${queryTag}_wallets */`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "WalletTransaction" ORDER BY "createdAt" ASC /* ${queryTag}_transactions */`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "Lesson" ORDER BY "createdAt" ASC /* ${queryTag}_lessons */`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "Settings" ORDER BY "id" ASC /* ${queryTag}_settings */`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "Commission" ORDER BY "createdAt" ASC /* ${queryTag}_commissions */`),
-    prisma.$queryRawUnsafe(`SELECT * FROM "DeletionRequest" ORDER BY "createdAt" ASC /* ${queryTag}_deletions */`)
-  ]);
+  const snapshot = await prisma.$transaction(async (transaction) => {
+    const tables = await transaction.$queryRawUnsafe(
+      `SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' ORDER BY tablename /* ${queryTag}_tables */`
+    );
+    const snapshot = {};
+    for (const { tablename } of tables) {
+      const safeTableName = String(tablename).replace(/"/g, '""');
+      snapshot[tablename] = await transaction.$queryRawUnsafe(
+        `SELECT * FROM "${safeTableName}" /* ${queryTag}_${safeTableName} */`
+      );
+    }
+    return snapshot;
+  }, { timeout: 30000 });
+
+  const counts = Object.fromEntries(Object.entries(snapshot).map(([table, rows]) => [table, rows.length]));
 
   const data = {
     metadata: {
@@ -31,16 +36,8 @@ async function main() {
       databaseProvider: "postgresql",
       warning: "Bu dosya parola özetleri ve kişisel bilgiler içerir; gizli tutulmalıdır."
     },
-    counts: {
-      users: users.length,
-      wallets: wallets.length,
-      walletTransactions: walletTransactions.length,
-      lessons: lessons.length,
-      settings: settings.length,
-      commissions: commissions.length,
-      deletionRequests: deletionRequests.length
-    },
-    data: { users, wallets, walletTransactions, lessons, settings, commissions, deletionRequests }
+    counts,
+    data: snapshot
   };
 
   const contents = JSON.stringify(data, null, 2);
@@ -55,7 +52,7 @@ async function main() {
 
   console.log(`BACKUP_OK ${outputPath}`);
   console.log(`SHA256 ${digest}`);
-  console.log(`COUNTS ${JSON.stringify(data.counts)}`);
+  console.log(`COUNTS ${JSON.stringify(counts)}`);
 }
 
 main()

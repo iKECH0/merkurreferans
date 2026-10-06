@@ -3,8 +3,11 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { getScenarioForReferrerRole } from "@/lib/revenueScenarios";
 
 export async function addStudentByReferrer(formData, referrerId) {
+  const session = await auth();
+  if (!session || session.user.id !== referrerId) return { error: "Yetkisiz işlem." };
   const name = formData.get("name");
   const username = formData.get("username");
   const password = formData.get("password");
@@ -24,6 +27,8 @@ export async function addStudentByReferrer(formData, referrerId) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  const referrer = await prisma.user.findUnique({ where: { id: referrerId }, select: { role: true } });
+  if (!referrer) return { error: "Referans sahibi bulunamadı." };
 
   try {
     await prisma.user.create({
@@ -34,6 +39,8 @@ export async function addStudentByReferrer(formData, referrerId) {
         phone: phone || null,
         role: "STUDENT",
         referrerId: referrerId,
+        referrerRoleAtJoin: referrer.role,
+        referralScenario: getScenarioForReferrerRole(referrer.role),
         isActive: false, // Yöneticinin onaylaması gerekir
         requestedMonths: requestedMonths
       }

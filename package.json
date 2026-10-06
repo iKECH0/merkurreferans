@@ -9,6 +9,7 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "backup": "node scripts/backup-database.js",
+    "backfill:referral-scenarios": "node scripts/backfill-referral-scenarios.js",
     "db:push:safe": "npm run backup && prisma db push",
     "deploy:check": "npm run backup && npm run build"
   },

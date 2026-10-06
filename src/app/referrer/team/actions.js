@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
+import { getScenarioForReferrerRole } from "@/lib/revenueScenarios";
 import { ROLE_OPTIONS_FOR_REFERRAL } from "@/lib/roleConstants";
 
 export async function addTeacherToTeam(formData) {
@@ -31,6 +32,7 @@ export async function addTeacherToTeam(formData) {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   try {
+    const sponsor = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     await prisma.user.create({
       data: {
         name,
@@ -39,6 +41,8 @@ export async function addTeacherToTeam(formData) {
         referralCode,
         role: role,
         referrerId: session.user.id, // Lider öğretmenin ID'si (Sponsor)
+        referrerRoleAtJoin: sponsor?.role || session.user.role,
+        referralScenario: getScenarioForReferrerRole(sponsor?.role || session.user.role),
         isActive: true,
         wallet: {
           create: {

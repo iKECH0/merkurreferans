@@ -2,6 +2,38 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
+import { getRevenueScenario, normalizeScenarioShares } from "@/lib/revenueScenarios";
+import { isTeacherRole } from "@/lib/roleConstants";
+
+async function findTeacherInReferralChain(startUserId) {
+  let currentId = startUserId;
+  const visited = new Set();
+  while (currentId && !visited.has(currentId) && visited.size < 20) {
+    visited.add(currentId);
+    const candidate = await prisma.user.findUnique({
+      where: { id: currentId },
+      select: { id: true, role: true, referrerId: true }
+    });
+    if (!candidate) return null;
+    if (isTeacherRole(candidate.role)) return candidate;
+    currentId = candidate.referrerId;
+  }
+  return null;
+}
+
+async function creditSubscriptionShare({ recipientId, sourceUser, amount, scenario, label }) {
+  if (!recipientId || amount <= 0) return false;
+  let wallet = await prisma.wallet.findUnique({ where: { userId: recipientId } });
+  if (!wallet) wallet = await prisma.wallet.create({ data: { userId: recipientId } });
+  await prisma.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: amount } } });
+  await prisma.walletTransaction.create({
+    data: { walletId: wallet.id, amount, type: "EARNED", description: `Paket Geliri (${label}, Senaryo ${scenario}) - ${sourceUser.name || sourceUser.username}` }
+  });
+  await prisma.commission.create({
+    data: { userId: recipientId, sourceUserId: sourceUser.id, amount, status: "PAID" }
+  });
+  return true;
+}
 
 export async function addStudent(formData) {
   const name = formData.get("name");
@@ -38,6 +70,7 @@ export async function addStudent(formData) {
       username,
       password: hashedPassword,
       role: "STUDENT",
+      referralScenario: "A",
       subscriptionEnd,
       isActive: true
     }
@@ -70,6 +103,7 @@ export async function addMultipleStudents(studentsData) {
           username: student.username,
           password: hashedPassword,
           role: "STUDENT",
+          referralScenario: "A",
           subscriptionEnd,
           isActive: true
         }
@@ -131,7 +165,7 @@ export async function deleteStudent(userId) {
 
 export async function approveStudent(userId, subscriptionMonths = 1) {
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { referrer: true } });
     if (!user) return { error: "Öğrenci bulunamadı." };
     if (user.isActive) return { error: "Öğrenci zaten aktif." };
 
@@ -143,64 +177,46 @@ export async function approveStudent(userId, subscriptionMonths = 1) {
       data: { isActive: true, subscriptionEnd }
     });
 
-    // MLM: 3-Level Commission Tree
-    if (user.referrerId) {
-      const settings = await prisma.settings.findUnique({ where: { id: "GLOBAL" } });
-      const baseCommission = settings?.commissionRate || 15.0;
-      const totalCommissionAmount = baseCommission * parseInt(subscriptionMonths, 10);
-      
-      let currentReferrerId = user.referrerId;
-      let level = 1;
-      const rates = [1.0, 0.5, 0.25]; // Kademe 1: %100, Kademe 2: %50, Kademe 3: %25
+    const settings = await prisma.settings.findUnique({ where: { id: "GLOBAL" } });
+    const totalRevenue = (settings?.commissionRate || 15) * parseInt(subscriptionMonths, 10);
+    const scenario = getRevenueScenario(user);
+    const teacher = await findTeacherInReferralChain(user.referrerId);
+    const teacherRole = teacher?.role && isTeacherRole(teacher.role) ? teacher.role : "TEACHER";
+    const shares = normalizeScenarioShares(settings?.scenarioShares, settings || {})[teacherRole][scenario];
 
-      while (currentReferrerId && level <= 3) {
-        const referrer = await prisma.user.findUnique({ 
-          where: { id: currentReferrerId },
-          include: { wallet: true }
-        });
-        
-        if (!referrer) break;
-        
-        const rate = rates[level - 1];
-        const commissionAmount = totalCommissionAmount * rate;
-        
-        if (commissionAmount > 0) {
-          // Eski Commission tablosuna kayıt
-          await prisma.commission.create({
-            data: {
-              userId: referrer.id,
-              sourceUserId: user.id,
-              amount: commissionAmount,
-              status: "PAID" // Admin onayladığı için direkt cüzdana yansır
-            }
-          });
-          
-          // Cüzdan kontrolü ve bakiyenin artırılması
-          let walletId = referrer.wallet?.id;
-          if (!walletId) {
-            const newWallet = await prisma.wallet.create({ data: { userId: referrer.id } });
-            walletId = newWallet.id;
-          }
-          
-          await prisma.wallet.update({
-            where: { id: walletId },
-            data: { balance: { increment: commissionAmount } }
-          });
-          
-          await prisma.walletTransaction.create({
-            data: {
-              walletId: walletId,
-              amount: commissionAmount,
-              type: "EARNED",
-              description: `Abonelik Satışı (Kademe ${level} Kazancı) - ${user.name || user.username}`
-            }
-          });
-        }
-        
-        currentReferrerId = referrer.referrerId; // Ağaçta yukarı çık
-        level++;
+    const teacherPaid = await creditSubscriptionShare({
+      recipientId: teacher?.id,
+      sourceUser: user,
+      amount: totalRevenue * (shares.teacher / 100),
+      scenario,
+      label: `Öğretmen Payı %${shares.teacher}`
+    });
+
+    const referralParticipant = scenario === "C" ? "parent" : scenario === "D" ? "student" : null;
+    const referralPaid = referralParticipant
+      ? await creditSubscriptionShare({
+          recipientId: user.referrerId,
+          sourceUser: user,
+          amount: totalRevenue * (shares[referralParticipant] / 100),
+          scenario,
+          label: `Referans Payı %${shares[referralParticipant]}`
+        })
+      : false;
+
+    const institutionPercent = shares.institution
+      + (teacherPaid ? 0 : shares.teacher)
+      + shares.parent
+      + shares.student
+      - (referralPaid ? shares[referralParticipant] : 0);
+    await prisma.institutionRevenue.create({
+      data: {
+        sourceUserId: user.id,
+        scenario,
+        amount: totalRevenue * (institutionPercent / 100),
+        type: "SUBSCRIPTION",
+        description: `Kurum paket payı (Senaryo ${scenario} / ${institutionPercent}%) - ${user.name || user.username}`
       }
-    }
+    });
 
     revalidatePath("/admin/users");
     revalidatePath("/referrer");

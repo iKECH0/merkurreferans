@@ -4,7 +4,7 @@ import { updateSettings, updateAdminCredentials } from "./actions";
 import { ROLE_LABELS_TR, TEACHER_ROLES } from "@/lib/roleConstants";
 import { normalizeScenarioShares, REVENUE_SCENARIOS, SHARE_PARTICIPANTS } from "@/lib/revenueScenarios";
 
-export default function SettingsClient({ currentSettings }) {
+export default function SettingsClient({ currentSettings, institutionRevenueSummary, recentInstitutionRevenues }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [openScenario, setOpenScenario] = useState("A");
@@ -219,6 +219,21 @@ export default function SettingsClient({ currentSettings }) {
       </div>
 
       <div className="glass-panel" style={{ padding: '2rem', flex: '1', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+        <div>
+          <h3 style={{ color: '#fbbf24', marginBottom: '0.5rem' }}>Kurum Gelir Kaydı</h3>
+          <p style={{ fontSize: '1.8rem', fontWeight: 800, margin: '0 0 0.4rem' }}>₺{Number(institutionRevenueSummary?.total || 0).toFixed(2)}</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>{institutionRevenueSummary?.count || 0} kayıtlı gelir hareketi</p>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            {recentInstitutionRevenues?.map((revenue) => (
+              <div key={revenue.id} style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                <span style={{ fontSize: '0.78rem', color: '#cbd5e1' }}>Senaryo {revenue.scenario} · {revenue.type === 'LESSON' ? 'Ders' : 'Paket'}</span>
+                <strong style={{ color: '#10b981' }}>₺{Number(revenue.amount).toFixed(2)}</strong>
+              </div>
+            ))}
+            {(!recentInstitutionRevenues || recentInstitutionRevenues.length === 0) && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Henüz kurum gelir hareketi yok.</span>}
+          </div>
+        </div>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>
           <h3 style={{ color: '#10b981', marginBottom: '0.5rem' }}>Veri Yedekleme (JSON)</h3>

@@ -7,20 +7,21 @@ export async function GET() {
     return Response.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const [users, wallets, walletTransactions, lessons, settings, commissions, deletionRequests] = await prisma.$transaction([
+  const [users, wallets, walletTransactions, lessons, settings, commissions, institutionRevenues, deletionRequests] = await prisma.$transaction([
     prisma.user.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.wallet.findMany({ orderBy: { updatedAt: "asc" } }),
     prisma.walletTransaction.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.lesson.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.settings.findMany({ orderBy: { id: "asc" } }),
     prisma.commission.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.institutionRevenue.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.deletionRequest.findMany({ orderBy: { createdAt: "asc" } })
   ]);
 
   const createdAt = new Date();
   const body = JSON.stringify({
     metadata: { format: "merkur-full-backup-v1", createdAt: createdAt.toISOString() },
-    data: { users, wallets, walletTransactions, lessons, settings, commissions, deletionRequests }
+    data: { users, wallets, walletTransactions, lessons, settings, commissions, institutionRevenues, deletionRequests }
   }, null, 2);
 
   return new Response(body, {

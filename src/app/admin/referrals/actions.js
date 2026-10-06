@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { getScenarioForReferrerRole } from "@/lib/revenueScenarios";
 
 export async function addReferrer(formData) {
   const name = formData.get("name");
@@ -22,6 +23,9 @@ export async function addReferrer(formData) {
   if (existingCode) return { error: "Bu referans kodu kullanımda." };
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  const sponsor = referrerId
+    ? await prisma.user.findUnique({ where: { id: referrerId }, select: { role: true } })
+    : null;
 
   try {
     await prisma.user.create({
@@ -33,6 +37,8 @@ export async function addReferrer(formData) {
         role: role,
         isActive: true,
         ...(referrerId ? { referrerId } : {}),
+        referralScenario: sponsor ? getScenarioForReferrerRole(sponsor.role) : "A",
+        referrerRoleAtJoin: sponsor?.role || null,
         wallet: {
           create: {
             balance: 0.0,

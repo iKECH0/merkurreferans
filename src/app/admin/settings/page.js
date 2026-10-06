@@ -7,9 +7,11 @@ export const metadata = {
 };
 
 export default async function SettingsPage() {
-  const currentSettings = await prisma.settings.findUnique({
-    where: { id: "GLOBAL" }
-  });
+  const [currentSettings, institutionRevenueTotal, recentInstitutionRevenues] = await Promise.all([
+    prisma.settings.findUnique({ where: { id: "GLOBAL" } }),
+    prisma.institutionRevenue.aggregate({ _sum: { amount: true }, _count: true }),
+    prisma.institutionRevenue.findMany({ orderBy: { createdAt: "desc" }, take: 10 })
+  ]);
 
   return (
     <div className="dashboard-wrapper">
@@ -18,7 +20,11 @@ export default async function SettingsPage() {
         Platformun görünümünü ve PDF raporlarındaki logolarınızı buradan yönetebilirsiniz.
       </p>
 
-      <SettingsClient currentSettings={currentSettings} />
+      <SettingsClient
+        currentSettings={currentSettings}
+        institutionRevenueSummary={{ total: institutionRevenueTotal._sum.amount || 0, count: institutionRevenueTotal._count }}
+        recentInstitutionRevenues={recentInstitutionRevenues}
+      />
     </div>
   );
 }
