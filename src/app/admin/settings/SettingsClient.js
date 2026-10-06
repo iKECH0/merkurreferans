@@ -1,10 +1,25 @@
 "use client";
 import { useState } from "react";
 import { updateSettings, updateAdminCredentials } from "./actions";
+import { ROLE_LABELS_TR, TEACHER_ROLES } from "@/lib/roleConstants";
+import { normalizeScenarioShares, REVENUE_SCENARIOS, SHARE_PARTICIPANTS } from "@/lib/revenueScenarios";
 
 export default function SettingsClient({ currentSettings }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [openScenario, setOpenScenario] = useState("A");
+  const [scenarioShares, setScenarioShares] = useState(() => normalizeScenarioShares(currentSettings?.scenarioShares, currentSettings));
+
+  const updateScenarioShare = (role, scenario, participant, value) => {
+    const numericValue = Math.min(100, Math.max(0, Number(value) || 0));
+    setScenarioShares((current) => ({
+      ...current,
+      [role]: {
+        ...current[role],
+        [scenario]: { ...current[role][scenario], [participant]: numericValue }
+      }
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,6 +48,7 @@ export default function SettingsClient({ currentSettings }) {
       )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <input type="hidden" name="scenarioShares" value={JSON.stringify(scenarioShares)} />
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontWeight: 'bold' }}>Kurum Adı</label>
           <input 
@@ -74,32 +90,72 @@ export default function SettingsClient({ currentSettings }) {
           </p>
         </div>
 
-        <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <h4 style={{ marginBottom: '1rem', color: '#10b981' }}>Özel Ders Komisyon Yüzdeleri (%)</h4>
-          
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>Senaryo A: Kurum Öğrencisi - Öğretmen Payı (%)</label>
-            <input type="number" name="lessonTeacherShareA" defaultValue={currentSettings?.lessonTeacherShareA || 50.0} className="input-field" step="0.1" required />
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Öğrenciyi akademi getirdiyse öğretmenin alacağı pay.</p>
-          </div>
+        <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <h4 style={{ marginBottom: '0.5rem', color: '#10b981' }}>MERKÜR REFERANS – Gelir Paylaşım Senaryoları</h4>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+            Bir senaryoyu açarak her öğretmen kademesi için kurum, öğretmen, veli ve öğrenci paylarını ayrı ayrı belirleyin. Her satırın toplamı %100 olmalıdır.
+          </p>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>Senaryo B: Öğretmen Öğrencisi - Öğretmen Payı (%)</label>
-            <input type="number" name="lessonTeacherShareB" defaultValue={currentSettings?.lessonTeacherShareB || 65.0} className="input-field" step="0.1" required />
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Öğretmen öğrenciyi kendi getirdiyse alacağı pay.</p>
-          </div>
+          {REVENUE_SCENARIOS.map((scenario) => {
+            const isOpen = openScenario === scenario.key;
+            return (
+              <div key={scenario.key} style={{ marginBottom: '0.8rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+                <button
+                  type="button"
+                  onClick={() => setOpenScenario(isOpen ? null : scenario.key)}
+                  style={{ width: '100%', padding: '1rem', border: 0, cursor: 'pointer', textAlign: 'left', color: '#fff', background: isOpen ? 'rgba(16,185,129,0.12)' : 'rgba(15,23,42,0.6)', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}
+                >
+                  <span><strong>{scenario.key} Senaryosu – {scenario.title}</strong><br/><small style={{ color: '#94a3b8' }}>{scenario.description}</small></span>
+                  <span>{isOpen ? '▲' : '▼'}</span>
+                </button>
+                {isOpen && (
+                  <div className="table-responsive" style={{ padding: '0.75rem' }}>
+                    <table className="data-table" style={{ minWidth: '720px' }}>
+                      <thead>
+                        <tr>
+                          <th>Öğretmen Grubu</th>
+                          {SHARE_PARTICIPANTS.map((participant) => <th key={participant.key}>{participant.label} (%)</th>)}
+                          <th>Toplam</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {TEACHER_ROLES.map((role) => {
+                          const row = scenarioShares[role][scenario.key];
+                          const total = SHARE_PARTICIPANTS.reduce((sum, participant) => sum + Number(row[participant.key] || 0), 0);
+                          return (
+                            <tr key={role}>
+                              <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{ROLE_LABELS_TR[role]}</td>
+                              {SHARE_PARTICIPANTS.map((participant) => (
+                                <td key={participant.key}>
+                                  <input
+                                    aria-label={`${ROLE_LABELS_TR[role]} ${scenario.key} ${participant.label} payı`}
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={row[participant.key]}
+                                    onChange={(event) => updateScenarioShare(role, scenario.key, participant.key, event.target.value)}
+                                    className="input-field"
+                                    style={{ minWidth: '80px', padding: '0.55rem' }}
+                                  />
+                                </td>
+                              ))}
+                              <td style={{ fontWeight: 700, color: Math.abs(total - 100) < 0.01 ? '#10b981' : '#ef4444' }}>%{total}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>Lider Öğretmen Pasif Payı (%)</label>
-            <input type="number" name="leaderTeacherShare" defaultValue={currentSettings?.leaderTeacherShare || 10.0} className="input-field" step="0.1" required />
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Referansı sisteme katan Lider Öğretmenin, o referansın verdiği derslerden alacağı pasif pay.</p>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>Veli Tavsiye (Cüzdan Puanı) Payı (%)</label>
-            <input type="number" name="parentReferralBonus" defaultValue={currentSettings?.parentReferralBonus || 15.0} className="input-field" step="0.1" required />
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Veli başka veliyi getirdiğinde cüzdanına yansıyacak puan oranı.</p>
-          </div>
+          <input type="hidden" name="lessonTeacherShareA" value={scenarioShares.TEACHER.A.teacher} />
+          <input type="hidden" name="lessonTeacherShareB" value={scenarioShares.TEACHER.B.teacher} />
+          <input type="hidden" name="leaderTeacherShare" value={currentSettings?.leaderTeacherShare ?? 10} />
+          <input type="hidden" name="parentReferralBonus" value={currentSettings?.parentReferralBonus ?? 15} />
         </div>
 
         <div>

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import bcrypt from "bcryptjs";
+import { normalizeScenarioShares, REVENUE_SCENARIOS, SHARE_PARTICIPANTS } from "@/lib/revenueScenarios";
+import { TEACHER_ROLES } from "@/lib/roleConstants";
 
 export async function updateSettings(formData) {
   const institutionName = formData.get("institutionName");
@@ -14,6 +16,25 @@ export async function updateSettings(formData) {
   const lessonTeacherShareB = parseFloat(formData.get("lessonTeacherShareB")) || 65.0;
   const leaderTeacherShare = parseFloat(formData.get("leaderTeacherShare")) || 10.0;
   const parentReferralBonus = parseFloat(formData.get("parentReferralBonus")) || 15.0;
+  let scenarioShares;
+
+  try {
+    scenarioShares = normalizeScenarioShares(JSON.parse(formData.get("scenarioShares") || "{}"), {
+      lessonTeacherShareA,
+      lessonTeacherShareB
+    });
+  } catch {
+    return { error: "Senaryo oranları okunamadı." };
+  }
+
+  for (const role of TEACHER_ROLES) {
+    for (const { key } of REVENUE_SCENARIOS) {
+      const total = SHARE_PARTICIPANTS.reduce((sum, participant) => sum + scenarioShares[role][key][participant.key], 0);
+      if (Math.abs(total - 100) > 0.01) {
+        return { error: `${role} / Senaryo ${key} oranlarının toplamı %100 olmalıdır. Mevcut toplam: %${total}` };
+      }
+    }
+  }
 
   if (!institutionName) {
     return { error: "Kurum adı zorunludur." };
@@ -28,7 +49,8 @@ export async function updateSettings(formData) {
       lessonTeacherShareA,
       lessonTeacherShareB,
       leaderTeacherShare,
-      parentReferralBonus
+      parentReferralBonus,
+      scenarioShares
     };
 
     await prisma.settings.upsert({

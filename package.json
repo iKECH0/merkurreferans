@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "backup": "node scripts/backup-database.js",
+    "db:push:safe": "npm run backup && prisma db push",
+    "deploy:check": "npm run backup && npm run build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

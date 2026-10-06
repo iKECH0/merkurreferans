@@ -3,6 +3,26 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { createZoomMeeting } from "@/lib/zoom";
+import { getRevenueScenario, normalizeScenarioShares } from "@/lib/revenueScenarios";
+import { isTeacherRole } from "@/lib/roleConstants";
+
+async function creditRevenueShare({ userId, sourceUserId, lesson, amount, description }) {
+  if (!userId || amount <= 0) return;
+
+  let wallet = await prisma.wallet.findUnique({ where: { userId } });
+  if (!wallet) wallet = await prisma.wallet.create({ data: { userId } });
+
+  await prisma.wallet.update({
+    where: { id: wallet.id },
+    data: { balance: { increment: amount } }
+  });
+  await prisma.walletTransaction.create({
+    data: { walletId: wallet.id, amount, type: "EARNED", description }
+  });
+  await prisma.commission.create({
+    data: { userId, sourceUserId, lessonId: lesson.id, amount, status: "PAID" }
+  });
+}
 
 export async function createLesson(formData) {
   const session = await auth();
@@ -73,7 +93,7 @@ export async function createLesson(formData) {
 export async function executeLessonCompletion(lessonId) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    include: { teacher: true, student: true }
+    include: { teacher: true, student: { include: { referrer: true } } }
   });
 
   if (!lesson) {
@@ -89,56 +109,28 @@ export async function executeLessonCompletion(lessonId) {
     settings = await prisma.settings.create({ data: { id: "GLOBAL" } });
   }
 
-  // Komisyon Hesaplama (Senaryo A vs Senaryo B)
-  const isMyStudent = lesson.student?.referrerId === lesson.teacherId;
-  
-  const teacherSharePercent = isMyStudent 
-    ? settings.lessonTeacherShareB // %65
-    : settings.lessonTeacherShareA; // %50
+  const scenario = getRevenueScenario(lesson.student, lesson.teacherId);
+  const teacherRole = isTeacherRole(lesson.teacher.role) ? lesson.teacher.role : "TEACHER";
+  const matrix = normalizeScenarioShares(settings.scenarioShares, settings);
+  const shares = matrix[teacherRole][scenario];
 
-  const teacherCommission = lesson.price * (teacherSharePercent / 100);
-
-  // Öğretmene Cüzdan İşlemi
-  let teacherWallet = await prisma.wallet.findUnique({ where: { userId: lesson.teacherId } });
-  if (!teacherWallet) {
-    teacherWallet = await prisma.wallet.create({ data: { userId: lesson.teacherId } });
-  }
-
-  await prisma.wallet.update({
-    where: { id: teacherWallet.id },
-    data: { balance: { increment: teacherCommission } }
+  await creditRevenueShare({
+    userId: lesson.teacherId,
+    sourceUserId: lesson.studentId,
+    lesson,
+    amount: lesson.price * (shares.teacher / 100),
+    description: `Ders Ücreti (Senaryo ${scenario} / ${shares.teacher}% öğretmen payı) - ${lesson.title}`
   });
 
-  await prisma.walletTransaction.create({
-    data: {
-      walletId: teacherWallet.id,
-      amount: teacherCommission,
-      type: "EARNED",
-      description: `Ders Ücreti (${isMyStudent ? 'Senaryo B' : 'Senaryo A'}) - ${lesson.title}`
-    }
-  });
-
-  // Lider Öğretmen (Pasif Pay)
-  if (lesson.teacher?.referrerId) {
-    const leaderCommission = lesson.price * (settings.leaderTeacherShare / 100);
-    if (leaderCommission > 0) {
-      let leaderWallet = await prisma.wallet.findUnique({ where: { userId: lesson.teacher.referrerId } });
-      if (!leaderWallet) {
-        leaderWallet = await prisma.wallet.create({ data: { userId: lesson.teacher.referrerId } });
-      }
-      await prisma.wallet.update({
-        where: { id: leaderWallet.id },
-        data: { balance: { increment: leaderCommission } }
-      });
-      await prisma.walletTransaction.create({
-        data: {
-          walletId: leaderWallet.id,
-          amount: leaderCommission,
-          type: "EARNED",
-          description: `Ekip Ders Primi (Referans: ${lesson.teacher.name || lesson.teacher.username}) - ${lesson.title}`
-        }
-      });
-    }
+  const referralParticipant = scenario === "C" ? "parent" : scenario === "D" ? "student" : null;
+  if (referralParticipant && lesson.student.referrerId) {
+    await creditRevenueShare({
+      userId: lesson.student.referrerId,
+      sourceUserId: lesson.studentId,
+      lesson,
+      amount: lesson.price * (shares[referralParticipant] / 100),
+      description: `Referans Payı (Senaryo ${scenario} / ${shares[referralParticipant]}%) - ${lesson.title}`
+    });
   }
 
   // Dersi tamamlandı olarak işaretle
