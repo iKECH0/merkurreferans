@@ -37,6 +37,26 @@ model User {
   wallet       Wallet?
   lessonsGiven Lesson[] @relation("TeacherLessons")
   lessonsTaken Lesson[] @relation("StudentLessons")
+  visionContents VisionContent[]
+}
+
+model VisionContent {
+  id          String   @id @default(cuid())
+  title       String
+  format      String   @default("1:1")
+  durationMs  Int      @default(0)
+  data        Json
+  status      String   @default("DRAFT")
+  ownerId     String
+  legacyId    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([createdAt])
+  @@unique([legacyId])
 }
 
 model Wallet {

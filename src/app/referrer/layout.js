@@ -31,7 +31,7 @@ export default async function ReferrerLayout({ children }) {
     <div className="admin-container">
       <aside className="admin-sidebar glass-panel">
         <div className="sidebar-header">
-          <h2>MERKÜR YÖRÜNGE</h2>
+          <h2>MERKÜR REFERANS</h2>
           <span className="badge" style={{ background: '#10b981' }}>Profesyonel Öğretmen</span>
         </div>
         

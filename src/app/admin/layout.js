@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import LogoutButton from '@/components/LogoutButton';
-import { LayoutDashboard, Users, Video, Briefcase, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Video, Briefcase, Settings, LogOut, Presentation } from 'lucide-react';
 import './admin.css';
 
 export default async function AdminLayout({ children }) {
@@ -42,6 +42,10 @@ export default async function AdminLayout({ children }) {
           <Link href="/admin/lessons" className="nav-item">
             <Video className="nav-icon" size={20} />
             <span className="nav-text">Canlı Dersler</span>
+          </Link>
+          <Link href="/admin/vision" className="nav-item">
+            <Presentation className="nav-icon" size={20} />
+            <span className="nav-text">Merkür Vizyon</span>
           </Link>
           <Link href="/admin/referrals" className="nav-item">
             <Briefcase className="nav-icon" size={20} />
