@@ -62,6 +62,8 @@ function Studio({ onClose, onSaved, initial }) {
   const activeRef = useRef(null);
   const recorderRef = useRef(null);
   const recordingFrameRef = useRef(null);
+  const currentPageRef = useRef(null);
+  const backgroundImageRef = useRef(null);
   const startedAt = useRef(Date.now());
   const initialData = initial?.data || {};
   const [title, setTitle] = useState(initial?.title || 'Yeni Vizyon Dersi');
@@ -78,6 +80,17 @@ function Studio({ onClose, onSaved, initial }) {
   const [videoUrl, setVideoUrl] = useState(initial?.videoUrl || null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const page = pages.find((item) => item.id === pageId) || pages[0];
+
+  useEffect(() => {
+    currentPageRef.current = page;
+    if (!page?.background) {
+      backgroundImageRef.current = null;
+      return;
+    }
+    const image = new Image();
+    image.onload = () => { backgroundImageRef.current = image; };
+    image.src = page.background;
+  }, [page]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -180,7 +193,10 @@ function Studio({ onClose, onSaved, initial }) {
       streamRef.current.getTracks().forEach((track) => track.stop()); streamRef.current = null; setCameraOn(false); return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, facingMode: 'user' },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+      });
       streamRef.current = stream; cameraRef.current.srcObject = stream; setCameraOn(true);
       await cameraRef.current.play();
       return stream;
@@ -189,8 +205,19 @@ function Studio({ onClose, onSaved, initial }) {
 
   const drawCompositeFrame = (output, sourceCanvas, video) => {
     const ctx = output.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, output.width, output.height);
-    ctx.drawImage(sourceCanvas, 0, 0, output.width, output.height);
+    const canvasRect = sourceCanvas.getBoundingClientRect();
+    const livePage = currentPageRef.current;
+    const backgroundImage = backgroundImageRef.current;
+    ctx.save();
+    ctx.scale(output.width / canvasRect.width, output.height / canvasRect.height);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
+    if (backgroundImage?.complete) ctx.drawImage(backgroundImage, 0, 0, canvasRect.width, canvasRect.height);
+    livePage?.actions?.forEach((action) => drawAction(ctx, action));
+    ctx.restore();
     if (video?.readyState >= 2) {
       const x = Math.round(output.width * .04), y = Math.round(output.height * .69);
       const width = Math.round(output.width * .92), height = Math.round(output.height * .28);
@@ -210,12 +237,16 @@ function Studio({ onClose, onSaved, initial }) {
     let cameraStream = streamRef.current;
     if (!cameraStream) cameraStream = await toggleCamera();
     if (!cameraStream) return;
-    const dimensions = format === '9:16' ? [720, 1280] : format === '1:1' ? [1080, 1080] : [1280, 720];
+    const dimensions = format === '9:16' ? [1080, 1920] : format === '1:1' ? [1440, 1440] : [1920, 1080];
     const output = document.createElement('canvas'); output.width = dimensions[0]; output.height = dimensions[1];
     const composedStream = output.captureStream(30);
     cameraStream.getAudioTracks().forEach((track) => composedStream.addTrack(track));
     const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((type) => MediaRecorder.isTypeSupported(type));
-    const recorder = new MediaRecorder(composedStream, { mimeType, videoBitsPerSecond: 1800000, audioBitsPerSecond: 96000 });
+    const recorder = new MediaRecorder(composedStream, {
+      mimeType,
+      videoBitsPerSecond: format === '9:16' ? 8000000 : 6500000,
+      audioBitsPerSecond: 128000
+    });
     const chunks = [];
     recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
     recorder.onstop = () => {
@@ -256,7 +287,7 @@ function Studio({ onClose, onSaved, initial }) {
       <select value={format} onChange={(e) => setFormat(e.target.value)}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
       <label className={styles.headerButton}><ImagePlus size={18} /> Görsel<input hidden type="file" accept="image/*" onChange={handleImageUpload} /></label>
       <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={18} /> : <Video size={18} />} Kamera</button>
-      <button className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isRecording ? 'Kaydı Bitir' : 'Kayıt Başlat'}</button>
+      <button title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isRecording ? 'Kaydı Bitir' : 'Kayıt Başlat'}</button>
       {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo}><Download size={18} /> Videoyu indir</button>}
       <button className={styles.headerButton} onClick={downloadImage}><Download size={18} /> PNG indir</button>
       <button disabled={saving || isRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')}><Save size={18} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</button>
