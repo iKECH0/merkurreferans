@@ -1,23 +1,19 @@
 "use client";
 import { useState } from "react";
 import { updateSettings, updateAdminCredentials } from "./actions";
-import { ROLE_LABELS_TR, TEACHER_ROLES } from "@/lib/roleConstants";
-import { normalizeScenarioShares, REVENUE_SCENARIOS, SHARE_PARTICIPANTS } from "@/lib/revenueScenarios";
+import { normalizeScenarioShares, REVENUE_SCENARIOS, PAYOUT_ROWS } from "@/lib/revenueScenarios";
 
 export default function SettingsClient({ currentSettings, institutionRevenueSummary, recentInstitutionRevenues }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [openScenario, setOpenScenario] = useState("A");
-  const [scenarioShares, setScenarioShares] = useState(() => normalizeScenarioShares(currentSettings?.scenarioShares, currentSettings));
+  const [scenarioShares, setScenarioShares] = useState(() => normalizeScenarioShares(currentSettings?.scenarioShares));
 
-  const updateScenarioShare = (role, scenario, participant, value) => {
+  const updateScenarioShare = (scenario, row, value) => {
     const numericValue = Math.min(100, Math.max(0, Number(value) || 0));
     setScenarioShares((current) => ({
       ...current,
-      [role]: {
-        ...current[role],
-        [scenario]: { ...current[role][scenario], [participant]: numericValue }
-      }
+      [scenario]: { ...current[scenario], [row]: numericValue }
     }));
   };
 
@@ -86,14 +82,14 @@ export default function SettingsClient({ currentSettings, institutionRevenueSumm
             required 
           />
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Öğrenci abonelik paketini aldığında doğrudan davet edene gidecek standart tutar.
+            Paket/abonelik onayında senaryo yüzdelerine dağıtılacak aylık toplam gelir tutarı.
           </p>
         </div>
 
         <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
           <h4 style={{ marginBottom: '0.5rem', color: '#10b981' }}>MERKÜR REFERANS – Gelir Paylaşım Senaryoları</h4>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-            Bir senaryoyu açarak her öğretmen kademesi için kurum, öğretmen, veli ve öğrenci paylarını ayrı ayrı belirleyin. Her satırın toplamı %100 olmalıdır.
+            Her senaryoda gelir; öğretmen zinciri, veli, öğrenci ve kurum arasında tek bir yüzde tablosuyla paylaşılır. Toplam %100 olmalıdır.
           </p>
 
           {REVENUE_SCENARIOS.map((scenario) => {
@@ -110,40 +106,34 @@ export default function SettingsClient({ currentSettings, institutionRevenueSumm
                 </button>
                 {isOpen && (
                   <div className="table-responsive" style={{ padding: '0.75rem' }}>
-                    <table className="data-table" style={{ minWidth: '720px' }}>
+                    <table className="data-table" style={{ minWidth: '420px' }}>
                       <thead>
                         <tr>
-                          <th>Öğretmen Grubu</th>
-                          {SHARE_PARTICIPANTS.map((participant) => <th key={participant.key}>{participant.label} (%)</th>)}
-                          <th>Toplam</th>
+                          <th>Gelir Payı Alan</th>
+                          <th>Pay Oranı (%)</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {TEACHER_ROLES.map((role) => {
-                          const row = scenarioShares[role][scenario.key];
-                          const total = SHARE_PARTICIPANTS.reduce((sum, participant) => sum + Number(row[participant.key] || 0), 0);
-                          return (
-                            <tr key={role}>
-                              <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{ROLE_LABELS_TR[role]}</td>
-                              {SHARE_PARTICIPANTS.map((participant) => (
-                                <td key={participant.key}>
-                                  <input
-                                    aria-label={`${ROLE_LABELS_TR[role]} ${scenario.key} ${participant.label} payı`}
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                    value={row[participant.key]}
-                                    onChange={(event) => updateScenarioShare(role, scenario.key, participant.key, event.target.value)}
-                                    className="input-field"
-                                    style={{ minWidth: '80px', padding: '0.55rem' }}
-                                  />
-                                </td>
-                              ))}
-                              <td style={{ fontWeight: 700, color: Math.abs(total - 100) < 0.01 ? '#10b981' : '#ef4444' }}>%{total}</td>
-                            </tr>
-                          );
-                        })}
+                        {PAYOUT_ROWS.map((row) => (
+                          <tr key={row.key} style={{ background: row.key === 'INSTITUTION' ? 'rgba(251,191,36,0.06)' : 'transparent' }}>
+                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{row.label}</td>
+                            <td>
+                              <input
+                                aria-label={`${scenario.key} ${row.label} payı`}
+                                type="number" min="0" max="100" step="0.1"
+                                value={scenarioShares[scenario.key][row.key]}
+                                onChange={(event) => updateScenarioShare(scenario.key, row.key, event.target.value)}
+                                className="input-field" style={{ maxWidth: '130px', padding: '0.55rem' }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td style={{ fontWeight: 800 }}>Toplam</td>
+                          <td style={{ fontWeight: 800, color: Math.abs(PAYOUT_ROWS.reduce((sum, row) => sum + Number(scenarioShares[scenario.key][row.key] || 0), 0) - 100) < 0.01 ? '#10b981' : '#ef4444' }}>
+                            %{PAYOUT_ROWS.reduce((sum, row) => sum + Number(scenarioShares[scenario.key][row.key] || 0), 0)}
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -152,8 +142,8 @@ export default function SettingsClient({ currentSettings, institutionRevenueSumm
             );
           })}
 
-          <input type="hidden" name="lessonTeacherShareA" value={scenarioShares.TEACHER.A.teacher} />
-          <input type="hidden" name="lessonTeacherShareB" value={scenarioShares.TEACHER.B.teacher} />
+          <input type="hidden" name="lessonTeacherShareA" value={scenarioShares.A.TEACHER} />
+          <input type="hidden" name="lessonTeacherShareB" value={scenarioShares.B.TEACHER} />
           <input type="hidden" name="leaderTeacherShare" value={currentSettings?.leaderTeacherShare ?? 10} />
           <input type="hidden" name="parentReferralBonus" value={currentSettings?.parentReferralBonus ?? 15} />
         </div>

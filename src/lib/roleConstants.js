@@ -39,14 +39,14 @@ export const ROLE_LABELS_TR = {
 };
 
 export const ROLE_OPTIONS_FOR_REFERRAL = [
-  { value: "TEACHER", label: "👨‍🏫 Öğretmen" },
-  { value: "ACTIVE_TEACHER", label: "🌱 Aktif Öğretmen (5+ Öğrenci)" },
-  { value: "LEADER_TEACHER", label: "🚀 Lider Öğretmen (10+ Öğrenci)" },
-  { value: "EXPERT_TEACHER", label: "⭐ Uzman Öğretmen (20+ Öğrenci)" },
-  { value: "HEAD_TEACHER", label: "🏅 Başöğretmen (50+ Öğrenci)" },
-  { value: "ELITE_TEACHER", label: "💎 Seçkin Öğretmen (100+ Öğrenci)" },
-  { value: "PRESTIGE_TEACHER", label: "🏆 Prestijli Öğretmen (250+ Öğrenci)" },
   { value: "PRO_TEACHER", label: "👑 Profesyonel Öğretmen (500+ Öğrenci)" },
+  { value: "PRESTIGE_TEACHER", label: "🏆 Prestijli Öğretmen (250+ Öğrenci)" },
+  { value: "ELITE_TEACHER", label: "💎 Seçkin Öğretmen (100+ Öğrenci)" },
+  { value: "HEAD_TEACHER", label: "🏅 Başöğretmen (50+ Öğrenci)" },
+  { value: "EXPERT_TEACHER", label: "⭐ Uzman Öğretmen (20+ Öğrenci)" },
+  { value: "LEADER_TEACHER", label: "🚀 Lider Öğretmen (10+ Öğrenci)" },
+  { value: "ACTIVE_TEACHER", label: "🌱 Aktif Öğretmen (5+ Öğrenci)" },
+  { value: "TEACHER", label: "👨‍🏫 Öğretmen" },
   { value: "PARENT", label: "🏠 Veli" },
   { value: "STUDENT", label: "🎓 Öğrenci" }
 ];

@@ -2,12 +2,12 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import ResetPasswordClient from "./ResetPasswordClient";
-import { deleteStudent, approveStudent } from "./actions";
+import { deleteStudent, approveStudent, assignTeacher } from "./actions";
 import toast from 'react-hot-toast';
 import { customConfirm } from "@/lib/toastHelpers";
 import { getUserLevel } from "@/lib/userLevels";
 
-export default function StudentListClient({ initialStudents }) {
+export default function StudentListClient({ initialStudents, teachers }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -71,7 +71,7 @@ export default function StudentListClient({ initialStudents }) {
                 <th>Ad Soyad</th>
                 <th>Kullanıcı Adı</th>
                 <th>Abonelik Bitiş / Talep</th>
-
+                <th>Atanmış Öğretmen</th>
                 <th>Durum</th>
                 <th>İşlemler</th>
               </tr>
@@ -104,6 +104,24 @@ export default function StudentListClient({ initialStudents }) {
                         ? (student.subscriptionEnd ? new Date(student.subscriptionEnd).toLocaleDateString('tr-TR') : 'Sınırsız')
                         : <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{student.requestedMonths} Ay Talep Edildi</span>
                       }
+                    </td>
+
+                    <td>
+                      {student.role === 'STUDENT' ? (
+                        <select
+                          className="input-field"
+                          defaultValue={student.assignedTeacherId || ''}
+                          disabled={isPending}
+                          onChange={(event) => startTransition(async () => {
+                            const res = await assignTeacher(student.id, event.target.value);
+                            if (res?.error) toast.error(res.error); else toast.success('Öğretmen ataması güncellendi.');
+                          })}
+                          style={{ minWidth: '170px', padding: '0.45rem' }}
+                        >
+                          <option value="">Atanmamış</option>
+                          {teachers?.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name || teacher.username}</option>)}
+                        </select>
+                      ) : '—'}
                     </td>
 
                     <td>

@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { getScenarioForReferrerRole } from "@/lib/revenueScenarios";
+import { findTeacherInReferralChain } from "@/lib/revenueDistribution";
 
 export async function registerStudent(formData) {
   const name = formData.get("name");
@@ -48,6 +49,7 @@ export async function registerStudent(formData) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  const assignedTeacher = await findTeacherInReferralChain(prisma, referrerId);
   
   // Generate a unique referral code for the new user
   const myReferralCode = username.toUpperCase().replace(/[^A-Z0-9]/g, '') + Math.floor(100 + Math.random() * 900);
@@ -66,6 +68,7 @@ export async function registerStudent(formData) {
         referrerId,
         referrerRoleAtJoin,
         referralScenario,
+        assignedTeacherId: assignedTeacher?.id || null,
         referralCode: myReferralCode,
         requestedMonths,
         wallet: {

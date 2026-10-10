@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { addStudent } from "./actions";
 
-export default function AddStudentClient() {
+export default function AddStudentClient({ teachers }) {
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,6 +52,13 @@ export default function AddStudentClient() {
               <div className="form-group">
                 <label>Giriş Şifresi</label>
                 <input type="text" name="password" className="input-field" required placeholder="Şifre belirleyin" />
+              </div>
+              <div className="form-group">
+                <label>Atanmış Öğretmen</label>
+                <select name="assignedTeacherId" className="input-field">
+                  <option value="">Daha sonra atanacak</option>
+                  {teachers?.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name || teacher.username}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label>Abonelik Süresi</label>

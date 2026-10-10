@@ -3,33 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { createZoomMeeting } from "@/lib/zoom";
-import { getRevenueScenario, normalizeScenarioShares } from "@/lib/revenueScenarios";
-import { isTeacherRole } from "@/lib/roleConstants";
-
-async function creditRevenueShare({ userId, sourceUserId, lesson, amount, description }) {
-  if (!userId || amount <= 0) return;
-
-  let wallet = await prisma.wallet.findUnique({ where: { userId } });
-  if (!wallet) wallet = await prisma.wallet.create({ data: { userId } });
-
-  await prisma.wallet.update({
-    where: { id: wallet.id },
-    data: { balance: { increment: amount } }
-  });
-  await prisma.walletTransaction.create({
-    data: { walletId: wallet.id, amount, type: "EARNED", description }
-  });
-  await prisma.commission.create({
-    data: { userId, sourceUserId, lessonId: lesson.id, amount, status: "PAID" }
-  });
-}
-
-async function recordInstitutionRevenue({ sourceUserId, lessonId, scenario, amount, type, description }) {
-  if (amount <= 0) return;
-  await prisma.institutionRevenue.create({
-    data: { sourceUserId, lessonId, scenario, amount, type, description }
-  });
-}
+import { distributeRevenue } from "@/lib/revenueDistribution";
 
 export async function createLesson(formData) {
   const session = await auth();
@@ -98,72 +72,34 @@ export async function createLesson(formData) {
 }
 
 export async function executeLessonCompletion(lessonId) {
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    include: { teacher: true, student: { include: { referrer: true } } }
-  });
-
-  if (!lesson) {
-    return { error: "Geçersiz ders." };
-  }
-  
-  if (lesson.status === "COMPLETED") {
-    return { error: "Bu ders zaten tamamlanmış." };
-  }
-
-  let settings = await prisma.settings.findUnique({ where: { id: "GLOBAL" } });
-  if (!settings) {
-    settings = await prisma.settings.create({ data: { id: "GLOBAL" } });
-  }
-
-  const scenario = getRevenueScenario(lesson.student, lesson.teacherId);
-  const teacherRole = isTeacherRole(lesson.teacher.role) ? lesson.teacher.role : "TEACHER";
-  const matrix = normalizeScenarioShares(settings.scenarioShares, settings);
-  const shares = matrix[teacherRole][scenario];
-
-  await creditRevenueShare({
-    userId: lesson.teacherId,
-    sourceUserId: lesson.studentId,
-    lesson,
-    amount: lesson.price * (shares.teacher / 100),
-    description: `Ders Ücreti (Senaryo ${scenario} / ${shares.teacher}% öğretmen payı) - ${lesson.title}`
-  });
-
-  const referralParticipant = scenario === "C" ? "parent" : scenario === "D" ? "student" : null;
-  if (referralParticipant && lesson.student.referrerId) {
-    await creditRevenueShare({
-      userId: lesson.student.referrerId,
-      sourceUserId: lesson.studentId,
-      lesson,
-      amount: lesson.price * (shares[referralParticipant] / 100),
-      description: `Referans Payı (Senaryo ${scenario} / ${shares[referralParticipant]}%) - ${lesson.title}`
+  const result = await prisma.$transaction(async (db) => {
+    const lesson = await db.lesson.findUnique({
+      where: { id: lessonId },
+      include: { teacher: { select: { id: true, role: true, referrerId: true } }, student: { include: { referrer: true } } }
     });
-  }
-
-  const referralSharePaid = referralParticipant && lesson.student.referrerId
-    ? shares[referralParticipant]
-    : 0;
-  const institutionPercent = shares.institution + shares.parent + shares.student - referralSharePaid;
-  await recordInstitutionRevenue({
-    sourceUserId: lesson.studentId,
-    lessonId: lesson.id,
-    scenario,
-    amount: lesson.price * (institutionPercent / 100),
-    type: "LESSON",
-    description: `Kurum ders payı (Senaryo ${scenario} / ${institutionPercent}%) - ${lesson.title}`
+    if (!lesson) return { error: "Geçersiz ders." };
+    if (lesson.status === "COMPLETED") return { error: "Bu ders zaten tamamlanmış." };
+    const settings = await db.settings.upsert({ where: { id: "GLOBAL" }, update: {}, create: { id: "GLOBAL" } });
+    await distributeRevenue(db, {
+      sourceUser: lesson.student,
+      assignedTeacher: lesson.teacher,
+      lessonId: lesson.id,
+      totalRevenue: lesson.price,
+      type: "LESSON",
+      description: `Ders Ücreti - ${lesson.title}`,
+      settings
+    });
+    await db.lesson.update({ where: { id: lessonId }, data: { status: "COMPLETED" } });
+    return { success: true };
   });
 
-  // Dersi tamamlandı olarak işaretle
-  await prisma.lesson.update({
-    where: { id: lessonId },
-    data: { status: "COMPLETED" }
-  });
+  if (result?.error) return result;
 
   revalidatePath("/referrer/lessons");
   revalidatePath("/referrer/commissions");
   revalidatePath("/student/lessons");
   revalidatePath("/student");
-  return { success: true };
+  return result;
 }
 
 export async function completeLesson(lessonId) {

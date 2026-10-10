@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { getScenarioForReferrerRole } from "@/lib/revenueScenarios";
+import { findTeacherInReferralChain } from "@/lib/revenueDistribution";
 
 export async function addStudentByReferrer(formData, referrerId) {
   const session = await auth();
@@ -29,6 +30,7 @@ export async function addStudentByReferrer(formData, referrerId) {
   const hashedPassword = await bcrypt.hash(password, 10);
   const referrer = await prisma.user.findUnique({ where: { id: referrerId }, select: { role: true } });
   if (!referrer) return { error: "Referans sahibi bulunamadı." };
+  const assignedTeacher = await findTeacherInReferralChain(prisma, referrerId);
 
   try {
     await prisma.user.create({
@@ -41,6 +43,7 @@ export async function addStudentByReferrer(formData, referrerId) {
         referrerId: referrerId,
         referrerRoleAtJoin: referrer.role,
         referralScenario: getScenarioForReferrerRole(referrer.role),
+        assignedTeacherId: assignedTeacher?.id || null,
         isActive: false, // Yöneticinin onaylaması gerekir
         requestedMonths: requestedMonths
       }

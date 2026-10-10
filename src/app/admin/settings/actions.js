@@ -3,8 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import bcrypt from "bcryptjs";
-import { normalizeScenarioShares, REVENUE_SCENARIOS, SHARE_PARTICIPANTS } from "@/lib/revenueScenarios";
-import { TEACHER_ROLES } from "@/lib/roleConstants";
+import { normalizeScenarioShares, REVENUE_SCENARIOS, PAYOUT_ROWS } from "@/lib/revenueScenarios";
 
 export async function updateSettings(formData) {
   const institutionName = formData.get("institutionName");
@@ -19,20 +18,15 @@ export async function updateSettings(formData) {
   let scenarioShares;
 
   try {
-    scenarioShares = normalizeScenarioShares(JSON.parse(formData.get("scenarioShares") || "{}"), {
-      lessonTeacherShareA,
-      lessonTeacherShareB
-    });
+    scenarioShares = normalizeScenarioShares(JSON.parse(formData.get("scenarioShares") || "{}"));
   } catch {
     return { error: "Senaryo oranları okunamadı." };
   }
 
-  for (const role of TEACHER_ROLES) {
-    for (const { key } of REVENUE_SCENARIOS) {
-      const total = SHARE_PARTICIPANTS.reduce((sum, participant) => sum + scenarioShares[role][key][participant.key], 0);
-      if (Math.abs(total - 100) > 0.01) {
-        return { error: `${role} / Senaryo ${key} oranlarının toplamı %100 olmalıdır. Mevcut toplam: %${total}` };
-      }
+  for (const { key } of REVENUE_SCENARIOS) {
+    const total = PAYOUT_ROWS.reduce((sum, row) => sum + scenarioShares[key][row.key], 0);
+    if (Math.abs(total - 100) > 0.01) {
+      return { error: `Senaryo ${key} oranlarının toplamı %100 olmalıdır. Mevcut toplam: %${total}` };
     }
   }
 

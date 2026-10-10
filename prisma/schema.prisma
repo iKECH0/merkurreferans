@@ -25,9 +25,12 @@ model User {
   referrerId         String?
   referralScenario   String?      // A, B, C veya D; kayıt anında sabitlenir
   referrerRoleAtJoin String?      // Referansı yapan kişinin kayıt anındaki rolü
+  assignedTeacherId  String?
   ibanDetails        String?      @db.Text
   referrer           User?        @relation("ReferralTree", fields: [referrerId], references: [id])
   referrals          User[]       @relation("ReferralTree")
+  assignedTeacher    User?        @relation("AssignedTeacher", fields: [assignedTeacherId], references: [id])
+  assignedStudents   User[]       @relation("AssignedTeacher")
   commissionsEarned  Commission[] @relation("CommissionsEarned")
   commissionsSourced Commission[] @relation("CommissionsSourced")
 
@@ -99,6 +102,10 @@ model Commission {
   lessonId     String?
   amount       Float // Komisyon Miktarı
   status       String   @default("PENDING") // PENDING, PAID
+  scenario     String?
+  payoutType   String?
+  percentage   Float?
+  configuration Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -115,6 +122,8 @@ model InstitutionRevenue {
   amount       Float
   type         String   // LESSON veya SUBSCRIPTION
   description  String?
+  percentage   Float?
+  configuration Json?
   createdAt    DateTime @default(now())
 
   @@index([sourceUserId])
