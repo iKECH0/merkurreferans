@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Circle, Download, Eraser, Highlighter, ImagePlus, Minus, Pen, Play, Plus, RectangleHorizontal, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { upload } from '@vercel/blob/client';
+import { upload as uploadBlob } from '@vercel/blob/client';
 import styles from './vision.module.css';
 
 const COLORS = ['#111827', '#ef4444', '#2563eb', '#16a34a', '#9333ea', '#f59e0b'];
@@ -22,11 +22,27 @@ function drawAction(ctx, action) {
   if (action.tool === 'highlighter') ctx.globalAlpha = 0.35;
   if (action.tool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
   if (['pen', 'highlighter', 'eraser'].includes(action.tool)) {
-    ctx.beginPath();
-    ctx.moveTo(first.x, first.y);
-    action.points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
-    if (action.points.length === 1) ctx.lineTo(first.x + 0.1, first.y + 0.1);
-    ctx.stroke();
+    if (action.points.length === 1) {
+      ctx.beginPath();
+      ctx.arc(first.x, first.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      let segmentStart = first;
+      for (let index = 1; index < action.points.length; index += 1) {
+        const current = action.points[index];
+        const next = action.points[index + 1] || current;
+        const midpoint = { x: (current.x + next.x) / 2, y: (current.y + next.y) / 2 };
+        if (action.tool === 'pen') {
+          const pressure = Number.isFinite(current.pressure) && current.pressure > 0 ? current.pressure : 0.5;
+          ctx.lineWidth = action.size * (0.72 + pressure * 0.56);
+        }
+        ctx.beginPath();
+        ctx.moveTo(segmentStart.x, segmentStart.y);
+        ctx.quadraticCurveTo(current.x, current.y, midpoint.x, midpoint.y);
+        ctx.stroke();
+        segmentStart = midpoint;
+      }
+    }
   } else if (action.tool === 'line') {
     ctx.beginPath(); ctx.moveTo(first.x, first.y); ctx.lineTo(last.x, last.y); ctx.stroke();
   } else if (action.tool === 'rectangle') {
@@ -94,7 +110,12 @@ function Studio({ onClose, onSaved, initial }) {
 
   const point = (event) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top, time: Date.now() - startedAt.current };
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      time: Date.now() - startedAt.current,
+      pressure: event.pointerType === 'mouse' ? 0.5 : Math.max(0.08, event.pressure || 0.5)
+    };
   };
   const start = (event) => {
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -102,7 +123,13 @@ function Studio({ onClose, onSaved, initial }) {
   };
   const move = (event) => {
     if (!activeRef.current) return;
-    activeRef.current.points.push(point(event));
+    const events = event.getCoalescedEvents?.() || [event];
+    events.forEach((pointerEvent) => {
+      const nextPoint = point(pointerEvent);
+      const previousPoint = activeRef.current.points[activeRef.current.points.length - 1];
+      const distance = Math.hypot(nextPoint.x - previousPoint.x, nextPoint.y - previousPoint.y);
+      if (distance >= 0.35) activeRef.current.points.push(nextPoint);
+    });
     const action = activeRef.current;
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), { ...action }] } : item));
   };
@@ -120,7 +147,7 @@ function Studio({ onClose, onSaved, initial }) {
       let uploadedVideoUrl = videoUrl;
       if (recordedBlob) {
         setUploadProgress(1);
-        const result = await upload(`vision/${Date.now()}-${title.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 60) || 'ders'}.webm`, recordedBlob, {
+        const result = await uploadBlob(`vision/${Date.now()}-${title.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 60) || 'ders'}.webm`, recordedBlob, {
           access: 'private',
           handleUploadUrl: '/api/vision/upload',
           multipart: true,
@@ -138,7 +165,7 @@ function Studio({ onClose, onSaved, initial }) {
     } catch (error) { toast.error(error.message); } finally { setSaving(false); setUploadProgress(0); }
   };
 
-  const upload = (event) => {
+  const handleImageUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return toast.error('Lütfen bir görsel seçin.');
     if (file.size > 4 * 1024 * 1024) return toast.error('Görsel en fazla 4 MB olabilir.');
@@ -227,7 +254,7 @@ function Studio({ onClose, onSaved, initial }) {
       <button className={styles.iconButton} onClick={onClose} title="Geri"><ArrowLeft size={20} /></button>
       <input className={styles.titleInput} value={title} maxLength={180} onChange={(e) => setTitle(e.target.value)} />
       <select value={format} onChange={(e) => setFormat(e.target.value)}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
-      <label className={styles.headerButton}><ImagePlus size={18} /> Görsel<input hidden type="file" accept="image/*" onChange={upload} /></label>
+      <label className={styles.headerButton}><ImagePlus size={18} /> Görsel<input hidden type="file" accept="image/*" onChange={handleImageUpload} /></label>
       <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={18} /> : <Video size={18} />} Kamera</button>
       <button className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isRecording ? 'Kaydı Bitir' : 'Kayıt Başlat'}</button>
       {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo}><Download size={18} /> Videoyu indir</button>}
