@@ -46,6 +46,7 @@ model VisionContent {
   format      String   @default("1:1")
   durationMs  Int      @default(0)
   data        Json
+  videoUrl    String?  @db.Text
   status      String   @default("DRAFT")
   ownerId     String
   legacyId    Int?

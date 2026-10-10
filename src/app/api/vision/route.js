@@ -15,7 +15,7 @@ export async function GET() {
 
   const contents = await prisma.visionContent.findMany({
     orderBy: { updatedAt: 'desc' },
-    select: { id: true, title: true, format: true, durationMs: true, status: true, legacyId: true, createdAt: true, updatedAt: true }
+    select: { id: true, title: true, format: true, durationMs: true, status: true, videoUrl: true, legacyId: true, createdAt: true, updatedAt: true }
   });
   return NextResponse.json({ contents });
 }
@@ -44,10 +44,11 @@ export async function POST(request) {
       format: body.format,
       durationMs: Math.max(0, Math.round(Number(body.durationMs) || 0)),
       status: body.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT',
+      videoUrl: typeof body.videoUrl === 'string' && body.videoUrl.includes('.private.blob.vercel-storage.com/') ? body.videoUrl : null,
       data: body.data,
       ownerId: session.user.id
     },
-    select: { id: true, title: true, format: true, durationMs: true, status: true, createdAt: true, updatedAt: true }
+    select: { id: true, title: true, format: true, durationMs: true, status: true, videoUrl: true, createdAt: true, updatedAt: true }
   });
   return NextResponse.json({ content }, { status: 201 });
 }

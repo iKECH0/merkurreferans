@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Circle, Download, Eraser, Highlighter, ImagePlus, Minus, Pen, Play, Plus, RectangleHorizontal, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { upload } from '@vercel/blob/client';
 import styles from './vision.module.css';
 
 const COLORS = ['#111827', '#ef4444', '#2563eb', '#16a34a', '#9333ea', '#f59e0b'];
@@ -43,6 +44,8 @@ function Studio({ onClose, onSaved, initial }) {
   const cameraRef = useRef(null);
   const streamRef = useRef(null);
   const activeRef = useRef(null);
+  const recorderRef = useRef(null);
+  const recordingFrameRef = useRef(null);
   const startedAt = useRef(Date.now());
   const initialData = initial?.data || {};
   const [title, setTitle] = useState(initial?.title || 'Yeni Vizyon Dersi');
@@ -54,6 +57,10 @@ function Studio({ onClose, onSaved, initial }) {
   const [size, setSize] = useState(4);
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState(null);
+  const [videoUrl, setVideoUrl] = useState(initial?.videoUrl || null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const page = pages.find((item) => item.id === pageId) || pages[0];
 
   const render = useCallback(() => {
@@ -80,7 +87,10 @@ function Studio({ onClose, onSaved, initial }) {
     window.addEventListener('resize', listener);
     return () => window.removeEventListener('resize', listener);
   }, [render]);
-  useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    if (recordingFrameRef.current) cancelAnimationFrame(recordingFrameRef.current);
+  }, []);
 
   const point = (event) => {
     const rect = canvasRef.current.getBoundingClientRect();
@@ -107,12 +117,25 @@ function Studio({ onClose, onSaved, initial }) {
     setSaving(true);
     try {
       const durationMs = Math.max(0, ...pages.flatMap((item) => item.actions.map((action) => action.endTime || 0)));
-      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, data: { version: 2, pages, currentPageId: pageId } }) });
+      let uploadedVideoUrl = videoUrl;
+      if (recordedBlob) {
+        setUploadProgress(1);
+        const result = await upload(`vision/${Date.now()}-${title.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 60) || 'ders'}.webm`, recordedBlob, {
+          access: 'private',
+          handleUploadUrl: '/api/vision/upload',
+          multipart: true,
+          contentType: 'video/webm',
+          onUploadProgress: ({ percentage }) => setUploadProgress(Math.round(percentage))
+        });
+        uploadedVideoUrl = result.url;
+        setVideoUrl(result.url);
+      }
+      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages, currentPageId: pageId, cameraLayout: 'bottom-wide' } }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Kayıt başarısız.');
       toast.success(status === 'PUBLISHED' ? 'İçerik yayımlandı.' : 'Taslak kaydedildi.');
       onSaved();
-    } catch (error) { toast.error(error.message); } finally { setSaving(false); }
+    } catch (error) { toast.error(error.message); } finally { setSaving(false); setUploadProgress(0); }
   };
 
   const upload = (event) => {
@@ -130,9 +153,63 @@ function Studio({ onClose, onSaved, initial }) {
       streamRef.current.getTracks().forEach((track) => track.stop()); streamRef.current = null; setCameraOn(false); return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream; cameraRef.current.srcObject = stream; setCameraOn(true);
+      await cameraRef.current.play();
+      return stream;
     } catch { toast.error('Kamera açılamadı. Tarayıcı iznini kontrol edin.'); }
+  };
+
+  const drawCompositeFrame = (output, sourceCanvas, video) => {
+    const ctx = output.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, output.width, output.height);
+    ctx.drawImage(sourceCanvas, 0, 0, output.width, output.height);
+    if (video?.readyState >= 2) {
+      const x = Math.round(output.width * .04), y = Math.round(output.height * .69);
+      const width = Math.round(output.width * .92), height = Math.round(output.height * .28);
+      const sourceRatio = video.videoWidth / video.videoHeight, targetRatio = width / height;
+      let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
+      if (sourceRatio > targetRatio) { sw = video.videoHeight * targetRatio; sx = (video.videoWidth - sw) / 2; }
+      else { sh = video.videoWidth / targetRatio; sy = (video.videoHeight - sh) / 2; }
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(x, y, width, height, Math.max(16, output.width * .018)); ctx.clip();
+      ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
+      ctx.restore();
+    }
+  };
+
+  const startRecording = async () => {
+    if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast.error('Tarayıcınız video kaydını desteklemiyor.');
+    let cameraStream = streamRef.current;
+    if (!cameraStream) cameraStream = await toggleCamera();
+    if (!cameraStream) return;
+    const dimensions = format === '9:16' ? [720, 1280] : format === '1:1' ? [1080, 1080] : [1280, 720];
+    const output = document.createElement('canvas'); output.width = dimensions[0]; output.height = dimensions[1];
+    const composedStream = output.captureStream(30);
+    cameraStream.getAudioTracks().forEach((track) => composedStream.addTrack(track));
+    const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((type) => MediaRecorder.isTypeSupported(type));
+    const recorder = new MediaRecorder(composedStream, { mimeType, videoBitsPerSecond: 1800000, audioBitsPerSecond: 96000 });
+    const chunks = [];
+    recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
+    recorder.onstop = () => {
+      if (recordingFrameRef.current) cancelAnimationFrame(recordingFrameRef.current);
+      setRecordedBlob(new Blob(chunks, { type: 'video/webm' }));
+      setIsRecording(false);
+      toast.success('Kamera ve tahta kaydı hazır. Kaydet ve Yayımla ile sisteme aktarabilirsiniz.');
+    };
+    const frame = () => { drawCompositeFrame(output, canvasRef.current, cameraRef.current); recordingFrameRef.current = requestAnimationFrame(frame); };
+    recorderRef.current = recorder; recorder.start(1000); frame(); setIsRecording(true); setRecordedBlob(null);
+  };
+
+  const stopRecording = () => recorderRef.current?.state === 'recording' && recorderRef.current.stop();
+
+  const downloadVideo = () => {
+    if (recordedBlob) {
+      const url = URL.createObjectURL(recordedBlob); const link = document.createElement('a');
+      link.href = url; link.download = `${title.trim().replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]+/g, '-') || 'merkur-vizyon'}.webm`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000); return;
+    }
+    if (initial?.id && videoUrl) window.location.href = `/api/vision/${initial.id}/video`;
   };
 
   const downloadImage = () => {
@@ -152,9 +229,11 @@ function Studio({ onClose, onSaved, initial }) {
       <select value={format} onChange={(e) => setFormat(e.target.value)}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
       <label className={styles.headerButton}><ImagePlus size={18} /> Görsel<input hidden type="file" accept="image/*" onChange={upload} /></label>
       <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={18} /> : <Video size={18} />} Kamera</button>
+      <button className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isRecording ? 'Kaydı Bitir' : 'Kayıt Başlat'}</button>
+      {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo}><Download size={18} /> Videoyu indir</button>}
       <button className={styles.headerButton} onClick={downloadImage}><Download size={18} /> PNG indir</button>
-      <button disabled={saving || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')}><Save size={18} /> Taslak</button>
-      <button disabled={saving || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')}><Save size={18} /> Kaydet ve Yayımla</button>
+      <button disabled={saving || isRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')}><Save size={18} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</button>
+      <button disabled={saving || isRecording || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')}><Save size={18} /> {saving && uploadProgress ? `Video yükleniyor %${uploadProgress}` : 'Kaydet ve Yayımla'}</button>
     </div>
     <div className={styles.workspace}>
       <aside className={styles.toolbar}>
@@ -166,7 +245,7 @@ function Studio({ onClose, onSaved, initial }) {
         <button title="Temizle" onClick={() => confirm('Bu sayfa temizlensin mi?') && setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [], background: null } : item))}><Trash2 size={20} /></button>
       </aside>
       <main className={styles.canvasArea}>
-        <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]}`}>
+        <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
           <canvas ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
           <video ref={cameraRef} autoPlay muted playsInline className={`${styles.camera} ${cameraOn ? '' : styles.hidden}`} />
         </div>
@@ -204,7 +283,7 @@ export default function VisionManager() {
     <div className={styles.hero}><div><span className={styles.eyebrow}>Yalnızca yönetici erişimi</span><h2>Merkür Vizyon</h2><p>Dijital tahtada ders içeriği hazırlayın, kaydedin ve yönetin.</p></div><button className={styles.primaryButton} onClick={() => setStudio({})}><Plus size={19} /> Yeni içerik hazırla</button></div>
     <div className={styles.listPanel}>
       <div className={styles.listHeader}><h3>Kayıtlı içerikler</h3><span>{contents.length} içerik</span></div>
-      {loading ? <p className={styles.empty}>Yükleniyor…</p> : contents.length === 0 ? <p className={styles.empty}>Henüz kayıtlı içerik yok. İlk içeriğinizi hazırlayabilirsiniz.</p> : <div className={styles.grid}>{contents.map((item) => <article key={item.id} className={styles.card}><div className={styles.cardIcon}><Play size={24} /></div><div><h4>{item.title}</h4><p>{item.format} · {new Date(item.updatedAt).toLocaleString('tr-TR')}</p><span className={item.status === 'PUBLISHED' ? styles.published : styles.draft}>{item.status === 'PUBLISHED' ? 'Yayımlandı' : 'Taslak'}</span></div><div className={styles.cardActions}><button onClick={() => openExisting(item.id)}>Aç</button><button className={styles.deleteButton} onClick={() => remove(item.id, item.title)}><Trash2 size={16} /></button></div></article>)}</div>}
+      {loading ? <p className={styles.empty}>Yükleniyor…</p> : contents.length === 0 ? <p className={styles.empty}>Henüz kayıtlı içerik yok. İlk içeriğinizi hazırlayabilirsiniz.</p> : <div className={styles.grid}>{contents.map((item) => <article key={item.id} className={styles.card}><div className={styles.cardIcon}>{item.videoUrl ? <Video size={24} /> : <Play size={24} />}</div><div><h4>{item.title}</h4><p>{item.format} · {item.videoUrl ? 'Kamera videosu var · ' : ''}{new Date(item.updatedAt).toLocaleString('tr-TR')}</p><span className={item.status === 'PUBLISHED' ? styles.published : styles.draft}>{item.status === 'PUBLISHED' ? 'Yayımlandı' : 'Taslak'}</span></div><div className={styles.cardActions}>{item.videoUrl && <a className={styles.downloadLink} href={`/api/vision/${item.id}/video`}><Download size={16} /></a>}<button onClick={() => openExisting(item.id)}>Aç</button><button className={styles.deleteButton} onClick={() => remove(item.id, item.title)}><Trash2 size={16} /></button></div></article>)}</div>}
     </div>
   </section>;
 }
