@@ -25,7 +25,7 @@ function drawAction(ctx, action) {
   ctx.save();
   ctx.strokeStyle = action.color;
   ctx.fillStyle = action.color;
-  ctx.lineWidth = action.tool === 'highlighter' ? action.size * 3 : action.tool === 'eraser' ? action.size * 2 : action.size;
+  ctx.lineWidth = action.tool === 'highlighter' ? action.size * 3 : action.tool === 'eraser' && !action.eraserDiameter ? action.size * 2 : action.size;
   ctx.lineCap = action.tool === 'highlighter' ? 'butt' : 'round';
   ctx.lineJoin = 'round';
   if (action.tool === 'highlighter') ctx.globalAlpha = 0.35;
@@ -59,7 +59,9 @@ function drawAction(ctx, action) {
         const midpoint = { x: (current.x + next.x) / 2, y: (current.y + next.y) / 2 };
         if (action.tool === 'pen') {
           const pressure = Number.isFinite(current.pressure) && current.pressure > 0 ? current.pressure : 0.5;
-          ctx.lineWidth = action.size * (0.72 + pressure * 0.56);
+          const previousPressure = Number.isFinite(action.points[index - 1]?.pressure) ? action.points[index - 1].pressure : pressure;
+          const smoothedPressure = previousPressure * .65 + pressure * .35;
+          ctx.lineWidth = action.size * (0.76 + smoothedPressure * 0.48);
         }
         ctx.beginPath();
         ctx.moveTo(segmentStart.x, segmentStart.y);
@@ -149,7 +151,9 @@ function Studio({ onClose, onSaved, initial }) {
   const [pageId, setPageId] = useState(initialData.currentPageId || initialData.pages?.[0]?.id);
   const [tool, setTool] = useState('pen');
   const [color, setColor] = useState(DEFAULT_BACKGROUNDS[initial?.format] ? '#ffffff' : '#111827');
-  const [size, setSize] = useState(4);
+  const [penSize, setPenSize] = useState(3);
+  const [highlighterSize, setHighlighterSize] = useState(8);
+  const [eraserSize, setEraserSize] = useState(32);
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -162,6 +166,8 @@ function Studio({ onClose, onSaved, initial }) {
   const [cropSelection, setCropSelection] = useState(null);
   const [backgroundAsset, setBackgroundAsset] = useState(null);
   const page = pages.find((item) => item.id === pageId) || pages[0];
+  const activeSize = tool === 'eraser' ? eraserSize : tool === 'highlighter' ? highlighterSize : penSize;
+  const setActiveSize = tool === 'eraser' ? setEraserSize : tool === 'highlighter' ? setHighlighterSize : setPenSize;
 
   useEffect(() => {
     currentPageRef.current = page;
@@ -256,7 +262,7 @@ function Studio({ onClose, onSaved, initial }) {
       setCropSelection(selection);
       return;
     }
-    activeRef.current = { id: crypto.randomUUID(), tool, color, size, points: [point(event)], startTime: Date.now() - startedAt.current };
+    activeRef.current = { id: crypto.randomUUID(), tool, color, size: activeSize, eraserDiameter: tool === 'eraser', points: [point(event)], startTime: Date.now() - startedAt.current };
   };
   const move = (event) => {
     if (cropMode && cropSelectionRef.current) {
@@ -271,7 +277,7 @@ function Studio({ onClose, onSaved, initial }) {
       const nextPoint = point(pointerEvent);
       const previousPoint = activeRef.current.points[activeRef.current.points.length - 1];
       const distance = Math.hypot(nextPoint.x - previousPoint.x, nextPoint.y - previousPoint.y);
-      if (distance >= 0.35) activeRef.current.points.push(nextPoint);
+      if (distance >= 0.12) activeRef.current.points.push(nextPoint);
     });
     const action = activeRef.current;
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), { ...action }] } : item));
@@ -616,7 +622,7 @@ function Studio({ onClose, onSaved, initial }) {
     </div>
     <div className={styles.workspace}>
       <aside className={styles.toolbar}>
-        <div className={styles.toolbarBrand}><div className={styles.toolbarBrandIcon}><Pen size={18} /></div><div><strong>Kalem Paneli</strong><span>Çizim araçları</span></div></div>
+        <div className={styles.toolbarBrand}><div className={styles.toolbarBrandIcon}><Pen size={18} /></div><div><strong>Akıllı Kalem Paneli</strong><span>Hassas çizim araçları</span></div><span className={styles.proBadge}>PRO</span></div>
         {TOOL_GROUPS.map((group) => <section className={styles.toolSection} key={group.title}>
           <p>{group.title}</p>
           <div className={styles.toolGrid}>{group.tools.map(([name, label, Icon]) => <button key={name} title={label} className={tool === name ? styles.activeTool : ''} onClick={() => setTool(name)}><Icon size={19} /><span>{label}</span></button>)}</div>
@@ -626,9 +632,13 @@ function Studio({ onClose, onSaved, initial }) {
           <div className={styles.colorGrid}>{COLORS.map((item) => <button key={item} aria-label={item} className={`${styles.color} ${color === item ? styles.activeColor : ''}`} style={{ background: item }} onClick={() => setColor(item)} />)}</div>
         </section>
         <section className={styles.toolSection}>
-          <div className={styles.rangeLabel}><p>Kalınlık</p><span>{size}px</span></div>
-          <input className={styles.sizeRange} aria-label="Kalınlık" type="range" min="2" max="24" value={size} onChange={(e) => setSize(Number(e.target.value))} />
-          <div className={styles.strokePreview}><span style={{ width: Math.min(46, size * 2), height: Math.max(2, size / 2), background: color }} /></div>
+          <div className={styles.rangeLabel}><p>{tool === 'eraser' ? 'Silgi Boyutu' : tool === 'highlighter' ? 'Fosforlu Kalınlığı' : 'Kalem Hassasiyeti'}</p><span>{activeSize}px</span></div>
+          <input className={styles.sizeRange} aria-label={tool === 'eraser' ? 'Silgi boyutu' : 'Çizgi kalınlığı'} type="range" min={tool === 'eraser' ? 8 : 1} max={tool === 'eraser' ? 80 : tool === 'highlighter' ? 24 : 12} step={tool === 'pen' ? .5 : 1} value={activeSize} onChange={(e) => setActiveSize(Number(e.target.value))} />
+          <div className={styles.strokePreview}><span className={tool === 'eraser' ? styles.eraserPreview : ''} style={{ width: Math.min(64, activeSize * 2), height: tool === 'eraser' ? Math.min(22, Math.max(8, activeSize / 3)) : Math.max(2, activeSize / 2), background: tool === 'eraser' ? '#fff' : color }} /></div>
+          <div className={styles.presetRow}>
+            {(tool === 'eraser' ? [[12, 'Küçük'], [32, 'Orta'], [64, 'Büyük']] : tool === 'highlighter' ? [[5, 'İnce'], [10, 'Orta'], [18, 'Kalın']] : [[1.5, 'İnce'], [3, 'Normal'], [6, 'Kalın']]).map(([value, label]) => <button key={value} className={activeSize === value ? styles.activePreset : ''} onClick={() => setActiveSize(value)}>{label}</button>)}
+          </div>
+          {tool === 'pen' && <div className={styles.sensitivityNote}><span className={styles.statusDot} /> Yüksek hassasiyet ve basınç desteği açık</div>}
         </section>
         {page.background && <section className={styles.toolSection}>
           <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
