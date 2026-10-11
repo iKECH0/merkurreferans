@@ -9,7 +9,8 @@ import styles from './vision.module.css';
 const COLORS = ['#111827', '#ffffff', '#ef4444', '#2563eb', '#16a34a', '#9333ea', '#f59e0b'];
 const DEFAULT_BACKGROUNDS = {
   '16:9': '/vision/merkur-vizyon-horizontal.jpeg',
-  '9:16': '/vision/merkur-vizyon-vertical.jpeg'
+  '9:16': '/vision/merkur-vizyon-vertical.jpeg',
+  '1:1': '/vision/merkur-vizyon-square.jpeg'
 };
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
 const TOOL_GROUPS = [
@@ -87,6 +88,41 @@ function drawBackground(ctx, image, width, height) {
   ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
+function getQuestionImageRect(image, width, height, format) {
+  const regions = {
+    '16:9': { x: width * .19, y: height * .23, width: width * .74, height: height * .33 },
+    '9:16': { x: width * .08, y: height * .25, width: width * .84, height: height * .46 },
+    '1:1': { x: width * .09, y: height * .24, width: width * .82, height: height * .37 }
+  };
+  const region = regions[format] || { x: width * .07, y: height * .09, width: width * .86, height: height * .82 };
+  const scale = Math.min(region.width / image.width, region.height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  return {
+    x: region.x + (region.width - drawWidth) / 2,
+    y: region.y + (region.height - drawHeight) / 2,
+    width: drawWidth,
+    height: drawHeight
+  };
+}
+
+function drawQuestionImage(ctx, image, width, height, format) {
+  if (!image?.width || !image?.height) return;
+  const rect = getQuestionImageRect(image, width, height, format);
+  const padding = Math.max(8, Math.min(width, height) * .012);
+  const radius = Math.max(10, Math.min(width, height) * .018);
+  ctx.save();
+  ctx.shadowColor = 'rgba(2,6,23,.24)';
+  ctx.shadowBlur = Math.max(12, Math.min(width, height) * .025);
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.roundRect(rect.x - padding, rect.y - padding, rect.width + padding * 2, rect.height + padding * 2, radius);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+  ctx.restore();
+}
+
 function Studio({ onClose, onSaved, initial }) {
   const canvasRef = useRef(null);
   const cameraRef = useRef(null);
@@ -98,6 +134,7 @@ function Studio({ onClose, onSaved, initial }) {
   const recordingSessionRef = useRef(0);
   const cropSelectionRef = useRef(null);
   const currentPageRef = useRef(null);
+  const brandBackgroundRef = useRef(null);
   const backgroundImageRef = useRef(null);
   const startedAt = useRef(Date.now());
   const initialData = initial?.data || {};
@@ -132,28 +169,31 @@ function Studio({ onClose, onSaved, initial }) {
   }, [pageId, format]);
 
   useEffect(() => {
-    const backgroundSource = page?.background || DEFAULT_BACKGROUNDS[format];
-    if (!backgroundSource) {
-      backgroundImageRef.current = null;
-      setBackgroundAsset(null);
-      return;
-    }
+    const brandSource = DEFAULT_BACKGROUNDS[format] || null;
+    const questionSource = page?.background || null;
     let cancelled = false;
+    brandBackgroundRef.current = null;
     backgroundImageRef.current = null;
     setBackgroundAsset(null);
-    const image = new Image();
-    image.onload = () => {
+    const loadImage = (source) => new Promise((resolve, reject) => {
+      if (!source) return resolve(null);
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = source;
+    });
+    Promise.all([loadImage(brandSource), loadImage(questionSource)]).then(([brandImage, questionImage]) => {
       if (cancelled) return;
-      backgroundImageRef.current = image;
-      setBackgroundAsset({ source: backgroundSource, image });
-    };
-    image.onerror = () => {
+      brandBackgroundRef.current = brandImage;
+      backgroundImageRef.current = questionImage;
+      setBackgroundAsset({ brandSource, questionSource, brandImage, questionImage });
+    }).catch(() => {
       if (cancelled) return;
+      brandBackgroundRef.current = null;
       backgroundImageRef.current = null;
       setBackgroundAsset(null);
-      toast.error('Tahta arka planı yüklenemedi.');
-    };
-    image.src = backgroundSource;
+      toast.error('Tahta görsellerinden biri yüklenemedi.');
+    });
     return () => { cancelled = true; };
   }, [page?.background, format]);
 
@@ -167,9 +207,13 @@ function Studio({ onClose, onSaved, initial }) {
     const ctx = canvas.getContext('2d');
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, rect.width, rect.height);
-    const backgroundSource = page.background || DEFAULT_BACKGROUNDS[format];
-    if (backgroundAsset?.source === backgroundSource && backgroundAsset.image.complete) {
-      drawBackground(ctx, backgroundAsset.image, rect.width, rect.height);
+    const brandSource = DEFAULT_BACKGROUNDS[format] || null;
+    const questionSource = page.background || null;
+    if (backgroundAsset?.brandSource === brandSource && backgroundAsset.brandImage?.complete) {
+      drawBackground(ctx, backgroundAsset.brandImage, rect.width, rect.height);
+    }
+    if (backgroundAsset?.questionSource === questionSource && backgroundAsset.questionImage?.complete) {
+      drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format);
     }
     page.actions.forEach((action) => drawAction(ctx, action));
   }, [page, format, backgroundAsset]);
@@ -232,11 +276,12 @@ function Studio({ onClose, onSaved, initial }) {
     const image = backgroundImageRef.current;
     if (!canvas || !image?.width || !image?.height || !selection) return toast.error('PDF sayfası henüz hazırlanıyor. Birkaç saniye sonra tekrar deneyin.');
     const rect = canvas.getBoundingClientRect();
-    const displayScale = Math.min(rect.width / image.width, rect.height / image.height);
-    const displayWidth = image.width * displayScale;
-    const displayHeight = image.height * displayScale;
-    const offsetX = (rect.width - displayWidth) / 2;
-    const offsetY = (rect.height - displayHeight) / 2;
+    const questionRect = getQuestionImageRect(image, rect.width, rect.height, format);
+    const displayScale = questionRect.width / image.width;
+    const displayWidth = questionRect.width;
+    const displayHeight = questionRect.height;
+    const offsetX = questionRect.x;
+    const offsetY = questionRect.y;
     const left = Math.max(offsetX, Math.min(selection.start.x, selection.end.x));
     const top = Math.max(offsetY, Math.min(selection.start.y, selection.end.y));
     const right = Math.min(offsetX + displayWidth, Math.max(selection.start.x, selection.end.x));
@@ -396,12 +441,14 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, output.width, output.height);
     const canvasRect = sourceCanvas.getBoundingClientRect();
     const livePage = currentPageRef.current;
-    const backgroundImage = backgroundImageRef.current;
+    const brandImage = brandBackgroundRef.current;
+    const questionImage = backgroundImageRef.current;
     ctx.save();
     ctx.scale(output.width / canvasRect.width, output.height / canvasRect.height);
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
-    if (backgroundImage?.complete) drawBackground(ctx, backgroundImage, canvasRect.width, canvasRect.height);
+    if (brandImage?.complete) drawBackground(ctx, brandImage, canvasRect.width, canvasRect.height);
+    if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format);
     livePage?.actions?.forEach((action) => drawAction(ctx, action));
     ctx.restore();
     if (video?.readyState >= 2) {
