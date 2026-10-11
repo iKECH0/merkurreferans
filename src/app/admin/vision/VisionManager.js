@@ -88,27 +88,32 @@ function drawBackground(ctx, image, width, height) {
   ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
-function getQuestionImageRect(image, width, height, format) {
+function getQuestionImageRect(image, width, height, format, requestedScale = 1.25) {
   const regions = {
     '16:9': { x: width * .19, y: height * .23, width: width * .74, height: height * .33 },
     '9:16': { x: width * .08, y: height * .25, width: width * .84, height: height * .46 },
     '1:1': { x: width * .09, y: height * .24, width: width * .82, height: height * .37 }
   };
   const region = regions[format] || { x: width * .07, y: height * .09, width: width * .86, height: height * .82 };
-  const scale = Math.min(region.width / image.width, region.height / image.height);
+  const fitScale = Math.min(region.width / image.width, region.height / image.height);
+  const questionScale = Math.min(1.8, Math.max(.5, Number(requestedScale) || 1.25));
+  const maxScale = Math.min(width * .94 / image.width, height * .86 / image.height);
+  const scale = Math.min(fitScale * questionScale, maxScale);
   const drawWidth = image.width * scale;
   const drawHeight = image.height * scale;
+  const centerX = region.x + region.width / 2;
+  const centerY = region.y + region.height / 2;
   return {
-    x: region.x + (region.width - drawWidth) / 2,
-    y: region.y + (region.height - drawHeight) / 2,
+    x: centerX - drawWidth / 2,
+    y: centerY - drawHeight / 2,
     width: drawWidth,
     height: drawHeight
   };
 }
 
-function drawQuestionImage(ctx, image, width, height, format) {
+function drawQuestionImage(ctx, image, width, height, format, questionScale) {
   if (!image?.width || !image?.height) return;
-  const rect = getQuestionImageRect(image, width, height, format);
+  const rect = getQuestionImageRect(image, width, height, format, questionScale);
   const padding = Math.max(8, Math.min(width, height) * .012);
   const radius = Math.max(10, Math.min(width, height) * .018);
   ctx.save();
@@ -213,7 +218,7 @@ function Studio({ onClose, onSaved, initial }) {
       drawBackground(ctx, backgroundAsset.brandImage, rect.width, rect.height);
     }
     if (backgroundAsset?.questionSource === questionSource && backgroundAsset.questionImage?.complete) {
-      drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format);
+      drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale);
     }
     page.actions.forEach((action) => drawAction(ctx, action));
   }, [page, format, backgroundAsset]);
@@ -276,7 +281,7 @@ function Studio({ onClose, onSaved, initial }) {
     const image = backgroundImageRef.current;
     if (!canvas || !image?.width || !image?.height || !selection) return toast.error('PDF sayfası henüz hazırlanıyor. Birkaç saniye sonra tekrar deneyin.');
     const rect = canvas.getBoundingClientRect();
-    const questionRect = getQuestionImageRect(image, rect.width, rect.height, format);
+    const questionRect = getQuestionImageRect(image, rect.width, rect.height, format, page.questionScale);
     const displayScale = questionRect.width / image.width;
     const displayWidth = questionRect.width;
     const displayHeight = questionRect.height;
@@ -341,6 +346,10 @@ function Studio({ onClose, onSaved, initial }) {
     toast.success('Son kırpma geri alındı.');
   };
 
+  const setQuestionScale = (questionScale) => {
+    setPages((old) => old.map((item) => item.id === page.id ? { ...item, questionScale } : item));
+  };
+
   const save = async (status) => {
     setSaving(true);
     try {
@@ -374,7 +383,7 @@ function Studio({ onClose, onSaved, initial }) {
     if (file.size > 15 * 1024 * 1024) return toast.error('Dosya en fazla 15 MB olabilir.');
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = () => setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result, backgroundHistory: [] } : item));
+      reader.onload = () => setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result, backgroundHistory: [], questionScale: 1.25 } : item));
       reader.readAsDataURL(file);
       return;
     }
@@ -405,7 +414,8 @@ function Studio({ onClose, onSaved, initial }) {
           id: crypto.randomUUID(),
           title: `${file.name.replace(/\.pdf$/i, '')} · ${pageNumber}`,
           actions: [],
-          background
+          background,
+          questionScale: 1.25
         });
       }
       setPages((old) => [...old, ...importedPages]);
@@ -448,7 +458,7 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
     if (brandImage?.complete) drawBackground(ctx, brandImage, canvasRect.width, canvasRect.height);
-    if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format);
+    if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format, livePage?.questionScale);
     livePage?.actions?.forEach((action) => drawAction(ctx, action));
     ctx.restore();
     if (video?.readyState >= 2) {
@@ -620,6 +630,14 @@ function Studio({ onClose, onSaved, initial }) {
           <input className={styles.sizeRange} aria-label="Kalınlık" type="range" min="2" max="24" value={size} onChange={(e) => setSize(Number(e.target.value))} />
           <div className={styles.strokePreview}><span style={{ width: Math.min(46, size * 2), height: Math.max(2, size / 2), background: color }} /></div>
         </section>
+        {page.background && <section className={styles.toolSection}>
+          <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
+          <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="50" max="180" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
+          <div className={styles.actionGrid}>
+            <button title="Soruyu çalışma alanına sığdır" onClick={() => setQuestionScale(1)}><ImagePlus size={18} /><span>Sığdır</span></button>
+            <button title="Soruyu büyük göster" onClick={() => setQuestionScale(1.5)}><Plus size={18} /><span>Büyük</span></button>
+          </div>
+        </section>}
         <section className={styles.toolSection}>
           <p>İşlemler</p>
           <div className={styles.actionGrid}><button title="Geri al" onClick={() => setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: item.actions.slice(0, -1) } : item))}><Undo2 size={19} /><span>Geri Al</span></button><button className={styles.clearTool} title="Temizle" onClick={() => confirm('Bu sayfa temizlensin mi?') && setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [], background: null, backgroundHistory: [] } : item))}><Trash2 size={19} /><span>Temizle</span></button></div>
