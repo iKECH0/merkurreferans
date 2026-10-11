@@ -287,7 +287,7 @@ function Studio({ onClose, onSaved, initial }) {
         uploadedVideoUrl = result.url;
         setVideoUrl(result.url);
       }
-      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages, currentPageId: pageId, cameraLayout: 'bottom-wide' } }) });
+      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages, currentPageId: pageId, cameraLayout: format === '1:1' ? 'bottom-square' : 'bottom-wide' } }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Kayıt başarısız.');
       toast.success(status === 'PUBLISHED' ? 'İçerik yayımlandı.' : 'Taslak kaydedildi.');
@@ -378,8 +378,11 @@ function Studio({ onClose, onSaved, initial }) {
     livePage?.actions?.forEach((action) => drawAction(ctx, action));
     ctx.restore();
     if (video?.readyState >= 2) {
-      const x = Math.round(output.width * .04), y = Math.round(output.height * .69);
-      const width = Math.round(output.width * .92), height = Math.round(output.height * .28);
+      const squareCamera = format === '1:1';
+      const x = Math.round(output.width * (squareCamera ? .31 : .04));
+      const y = Math.round(output.height * (squareCamera ? .59 : .69));
+      const width = Math.round(output.width * (squareCamera ? .38 : .92));
+      const height = Math.round(output.height * (squareCamera ? .38 : .28));
       const sourceRatio = video.videoWidth / video.videoHeight, targetRatio = width / height;
       let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
       if (sourceRatio > targetRatio) { sw = video.videoHeight * targetRatio; sx = (video.videoWidth - sw) / 2; }
@@ -387,6 +390,13 @@ function Studio({ onClose, onSaved, initial }) {
       ctx.save();
       ctx.beginPath(); ctx.roundRect(x, y, width, height, Math.max(16, output.width * .018)); ctx.clip();
       ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(4, output.width * .004);
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, Math.max(16, output.width * .018));
+      ctx.stroke();
       ctx.restore();
     }
   };
