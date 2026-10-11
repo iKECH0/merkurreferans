@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Circle, Download, Eraser, FileText, Highlighter, ImagePlus, Minus, Pen, Play, Plus, RectangleHorizontal, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
+import { ArrowLeft, Circle, Crop, Download, Eraser, FileText, Highlighter, ImagePlus, Minus, Pen, Play, Plus, RectangleHorizontal, RotateCcw, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { upload as uploadBlob } from '@vercel/blob/client';
 import styles from './vision.module.css';
@@ -92,6 +92,7 @@ function Studio({ onClose, onSaved, initial }) {
   const recordingFrameRef = useRef(null);
   const recordingOutputStreamRef = useRef(null);
   const recordingSessionRef = useRef(0);
+  const cropSelectionRef = useRef(null);
   const currentPageRef = useRef(null);
   const backgroundImageRef = useRef(null);
   const startedAt = useRef(Date.now());
@@ -111,10 +112,15 @@ function Studio({ onClose, onSaved, initial }) {
   const [videoUrl, setVideoUrl] = useState(initial?.videoUrl || null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentLoading, setDocumentLoading] = useState(false);
+  const [cropMode, setCropMode] = useState(false);
+  const [cropSelection, setCropSelection] = useState(null);
   const page = pages.find((item) => item.id === pageId) || pages[0];
 
   useEffect(() => {
     currentPageRef.current = page;
+    cropSelectionRef.current = null;
+    setCropSelection(null);
+    setCropMode(false);
     if (!page?.background) {
       backgroundImageRef.current = null;
       return;
@@ -167,9 +173,23 @@ function Studio({ onClose, onSaved, initial }) {
   };
   const start = (event) => {
     event.currentTarget.setPointerCapture(event.pointerId);
+    if (cropMode) {
+      if (!page.background) return toast.error('Kırpmak için önce bir PDF veya görsel ekleyin.');
+      const origin = point(event);
+      const selection = { start: origin, end: origin };
+      cropSelectionRef.current = selection;
+      setCropSelection(selection);
+      return;
+    }
     activeRef.current = { id: crypto.randomUUID(), tool, color, size, points: [point(event)], startTime: Date.now() - startedAt.current };
   };
   const move = (event) => {
+    if (cropMode && cropSelectionRef.current) {
+      const selection = { ...cropSelectionRef.current, end: point(event) };
+      cropSelectionRef.current = selection;
+      setCropSelection(selection);
+      return;
+    }
     if (!activeRef.current) return;
     const events = event.getCoalescedEvents?.() || [event];
     events.forEach((pointerEvent) => {
@@ -181,11 +201,73 @@ function Studio({ onClose, onSaved, initial }) {
     const action = activeRef.current;
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), { ...action }] } : item));
   };
+  const applyCrop = (selection) => {
+    const canvas = canvasRef.current;
+    const image = backgroundImageRef.current;
+    if (!canvas || !image?.width || !image?.height || !selection) return toast.error('PDF sayfası henüz hazırlanıyor. Birkaç saniye sonra tekrar deneyin.');
+    const rect = canvas.getBoundingClientRect();
+    const displayScale = Math.min(rect.width / image.width, rect.height / image.height);
+    const displayWidth = image.width * displayScale;
+    const displayHeight = image.height * displayScale;
+    const offsetX = (rect.width - displayWidth) / 2;
+    const offsetY = (rect.height - displayHeight) / 2;
+    const left = Math.max(offsetX, Math.min(selection.start.x, selection.end.x));
+    const top = Math.max(offsetY, Math.min(selection.start.y, selection.end.y));
+    const right = Math.min(offsetX + displayWidth, Math.max(selection.start.x, selection.end.x));
+    const bottom = Math.min(offsetY + displayHeight, Math.max(selection.start.y, selection.end.y));
+    if (right - left < 20 || bottom - top < 20) {
+      toast.error('Kırpılacak alan çok küçük. Daha geniş bir alan seçin.');
+      return;
+    }
+    const sourceX = Math.max(0, Math.round((left - offsetX) / displayScale));
+    const sourceY = Math.max(0, Math.round((top - offsetY) / displayScale));
+    const sourceWidth = Math.min(image.width - sourceX, Math.round((right - left) / displayScale));
+    const sourceHeight = Math.min(image.height - sourceY, Math.round((bottom - top) / displayScale));
+    const outputScale = Math.min(1, 2400 / Math.max(sourceWidth, sourceHeight));
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = Math.max(1, Math.round(sourceWidth * outputScale));
+    cropCanvas.height = Math.max(1, Math.round(sourceHeight * outputScale));
+    const context = cropCanvas.getContext('2d', { alpha: false });
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, cropCanvas.width, cropCanvas.height);
+    const croppedBackground = cropCanvas.toDataURL('image/jpeg', 0.92);
+    setPages((old) => old.map((item) => item.id === page.id ? {
+      ...item,
+      backgroundHistory: [...(item.backgroundHistory || []).slice(-4), item.background],
+      background: croppedBackground
+    } : item));
+    setCropMode(false);
+    toast.success('Seçilen alan kırpıldı.');
+  };
   const end = () => {
+    if (cropMode && cropSelectionRef.current) {
+      const selection = cropSelectionRef.current;
+      cropSelectionRef.current = null;
+      setCropSelection(null);
+      applyCrop(selection);
+      return;
+    }
     if (!activeRef.current) return;
     const action = { ...activeRef.current, endTime: Date.now() - startedAt.current };
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), action] } : item));
     activeRef.current = null;
+  };
+
+  const undoCrop = () => {
+    if (!page.backgroundHistory?.length) return;
+    setPages((old) => old.map((item) => {
+      if (item.id !== page.id) return item;
+      const history = [...item.backgroundHistory];
+      const previousBackground = history.pop();
+      return { ...item, background: previousBackground, backgroundHistory: history };
+    }));
+    setCropMode(false);
+    setCropSelection(null);
+    cropSelectionRef.current = null;
+    toast.success('Son kırpma geri alındı.');
   };
 
   const save = async (status) => {
@@ -220,7 +302,7 @@ function Studio({ onClose, onSaved, initial }) {
     if (file.size > 15 * 1024 * 1024) return toast.error('Dosya en fazla 15 MB olabilir.');
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = () => setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result } : item));
+      reader.onload = () => setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result, backgroundHistory: [] } : item));
       reader.readAsDataURL(file);
       return;
     }
@@ -422,6 +504,8 @@ function Studio({ onClose, onSaved, initial }) {
       <input className={styles.titleInput} value={title} maxLength={180} onChange={(e) => setTitle(e.target.value)} />
       <select value={format} onChange={(e) => setFormat(e.target.value)}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
       <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={18} /> {documentLoading ? 'PDF hazırlanıyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
+      {page?.background && <button className={`${styles.headerButton} ${cropMode ? styles.cropActive : ''}`} onClick={() => { setCropMode((value) => !value); setCropSelection(null); cropSelectionRef.current = null; }} title="Tahta üzerinde kırpılacak alanı sürükleyerek seçin"><Crop size={18} /> {cropMode ? 'Kırpmayı İptal Et' : 'PDF / Görsel Kırp'}</button>}
+      {!!page?.backgroundHistory?.length && <button className={styles.headerButton} onClick={undoCrop} title="Son kırpmayı geri al"><RotateCcw size={18} /> Kırpmayı Geri Al</button>}
       <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={18} /> : <Video size={18} />} Kamera</button>
       <button disabled={isFinalizingRecording} title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isFinalizingRecording ? 'Video hazırlanıyor…' : isRecording ? 'Kaydı Bitir' : recordedBlob ? 'Yeni Kayıt Başlat' : 'Kayıt Başlat'}</button>
       {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo}><Download size={18} /> Videoyu indir</button>}
@@ -447,12 +531,13 @@ function Studio({ onClose, onSaved, initial }) {
         </section>
         <section className={styles.toolSection}>
           <p>İşlemler</p>
-          <div className={styles.actionGrid}><button title="Geri al" onClick={() => setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: item.actions.slice(0, -1) } : item))}><Undo2 size={19} /><span>Geri Al</span></button><button className={styles.clearTool} title="Temizle" onClick={() => confirm('Bu sayfa temizlensin mi?') && setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [], background: null } : item))}><Trash2 size={19} /><span>Temizle</span></button></div>
+          <div className={styles.actionGrid}><button title="Geri al" onClick={() => setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: item.actions.slice(0, -1) } : item))}><Undo2 size={19} /><span>Geri Al</span></button><button className={styles.clearTool} title="Temizle" onClick={() => confirm('Bu sayfa temizlensin mi?') && setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [], background: null, backgroundHistory: [] } : item))}><Trash2 size={19} /><span>Temizle</span></button></div>
         </section>
       </aside>
       <main className={styles.canvasArea}>
         <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
-          <canvas ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+          <canvas className={cropMode ? styles.cropCursor : ''} ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+          {cropMode && cropSelection && <div className={styles.cropSelection} style={{ left: Math.min(cropSelection.start.x, cropSelection.end.x), top: Math.min(cropSelection.start.y, cropSelection.end.y), width: Math.abs(cropSelection.end.x - cropSelection.start.x), height: Math.abs(cropSelection.end.y - cropSelection.start.y) }} />}
           <video ref={cameraRef} autoPlay muted playsInline className={`${styles.camera} ${cameraOn ? '' : styles.hidden}`} />
         </div>
       </main>

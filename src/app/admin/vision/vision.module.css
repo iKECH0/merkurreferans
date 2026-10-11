@@ -5,6 +5,8 @@
 .primaryButton,.headerButton,.iconButton { border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:10px; font-weight:700; white-space:nowrap; }
 .primaryButton { padding:11px 16px; background:linear-gradient(135deg,#2563eb,#4f46e5); color:white; }
 .headerButton { padding:9px 12px; background:#e2e8f0; color:#0f172a; }
+.cropActive { background:#f59e0b; color:#451a03; box-shadow:0 0 0 3px rgba(245,158,11,.24); }
+.cropActive:hover:not(:disabled) { background:#d97706; color:#fff; }
 .primaryButton:hover:not(:disabled) { background:linear-gradient(135deg,#1d4ed8,#4338ca); color:#fff; box-shadow:0 6px 16px rgba(37,99,235,.24); }
 .headerButton:hover:not(:disabled) { background:#cbd5e1; color:#020617; }
 .iconButton:hover:not(:disabled) { background:#dbeafe; color:#1d4ed8; }
@@ -63,6 +65,11 @@
 .canvasShell { position:relative; background:white; box-shadow:0 24px 65px rgba(0,0,0,.48); width:min(100%,1200px); height:min(100%,840px); border-radius:4px; overflow:hidden; }
 .recordingShell { outline:4px solid #ef4444; }
 .canvasShell canvas { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+.canvasShell canvas.cropCursor { cursor:crosshair; }
+.cropSelection { position:absolute; z-index:4; pointer-events:none; border:3px solid #f59e0b; background:rgba(245,158,11,.13); box-shadow:0 0 0 9999px rgba(15,23,42,.38),0 0 0 1px #fff inset; }
+.cropSelection::before,.cropSelection::after { content:''; position:absolute; background:rgba(255,255,255,.8); }
+.cropSelection::before { left:33.333%; top:0; width:1px; height:100%; box-shadow:calc(100% + 33.333%) 0 0 rgba(255,255,255,.8); }
+.cropSelection::after { top:33.333%; left:0; height:1px; width:100%; box-shadow:0 calc(100% + 33.333%) 0 rgba(255,255,255,.8); }
 .format11 { aspect-ratio:1; width:min(100%,840px); height:auto; max-height:calc(100vh - 88px); }
 .format169 { aspect-ratio:16/9; width:min(100%,1200px); height:auto; }
 .format916 { aspect-ratio:9/16; width:auto; height:min(calc(100vh - 88px),880px); max-width:100%; }
