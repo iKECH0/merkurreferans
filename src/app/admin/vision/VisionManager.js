@@ -7,7 +7,10 @@ import { upload as uploadBlob } from '@vercel/blob/client';
 import styles from './vision.module.css';
 
 const COLORS = ['#111827', '#ffffff', '#ef4444', '#2563eb', '#16a34a', '#9333ea', '#f59e0b'];
-const DEFAULT_BACKGROUNDS = { '16:9': '/vision/merkur-vizyon-horizontal.jpeg' };
+const DEFAULT_BACKGROUNDS = {
+  '16:9': '/vision/merkur-vizyon-horizontal.jpeg',
+  '9:16': '/vision/merkur-vizyon-vertical.jpeg'
+};
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
 const TOOL_GROUPS = [
   { title: 'Çizim', tools: [['pen', 'Kalem', Pen], ['highlighter', 'Fosforlu', Highlighter], ['eraser', 'Silgi', Eraser]] },
@@ -103,7 +106,7 @@ function Studio({ onClose, onSaved, initial }) {
   const [pages, setPages] = useState(initialData.pages?.length ? initialData.pages : [emptyPage()]);
   const [pageId, setPageId] = useState(initialData.currentPageId || initialData.pages?.[0]?.id);
   const [tool, setTool] = useState('pen');
-  const [color, setColor] = useState(initial?.format === '16:9' ? '#ffffff' : '#111827');
+  const [color, setColor] = useState(DEFAULT_BACKGROUNDS[initial?.format] ? '#ffffff' : '#111827');
   const [size, setSize] = useState(4);
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
@@ -290,7 +293,8 @@ function Studio({ onClose, onSaved, initial }) {
         uploadedVideoUrl = result.url;
         setVideoUrl(result.url);
       }
-      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages, currentPageId: pageId, cameraLayout: format === '1:1' ? 'bottom-square' : 'bottom-wide' } }) });
+      const cameraLayout = format === '1:1' ? 'bottom-square' : format === '9:16' ? 'bottom-portrait-compact' : 'bottom-compact';
+      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages, currentPageId: pageId, cameraLayout } }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Kayıt başarısız.');
       toast.success(status === 'PUBLISHED' ? 'İçerik yayımlandı.' : 'Taslak kaydedildi.');
@@ -382,10 +386,11 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.restore();
     if (video?.readyState >= 2) {
       const squareCamera = format === '1:1';
-      const x = Math.round(output.width * (squareCamera ? .31 : .04));
-      const y = Math.round(output.height * (squareCamera ? .59 : .69));
-      const width = Math.round(output.width * (squareCamera ? .38 : .92));
-      const height = Math.round(output.height * (squareCamera ? .38 : .28));
+      const portraitCamera = format === '9:16';
+      const x = Math.round(output.width * (squareCamera ? .34 : portraitCamera ? .15 : .31));
+      const y = Math.round(output.height * (squareCamera ? .65 : portraitCamera ? .75 : .59));
+      const width = Math.round(output.width * (squareCamera ? .32 : portraitCamera ? .70 : .38));
+      const height = Math.round(output.height * (squareCamera ? .32 : portraitCamera ? .22 : .38));
       const sourceRatio = video.videoWidth / video.videoHeight, targetRatio = width / height;
       let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
       if (sourceRatio > targetRatio) { sw = video.videoHeight * targetRatio; sx = (video.videoWidth - sw) / 2; }
@@ -511,11 +516,17 @@ function Studio({ onClose, onSaved, initial }) {
     link.click();
   };
 
+  const cameraStyle = format === '1:1'
+    ? { left: '34%', bottom: '3%', width: '32%', height: '32%' }
+    : format === '9:16'
+      ? { left: '15%', bottom: '3%', width: '70%', height: '22%' }
+      : { left: '31%', bottom: '3%', width: '38%', height: '38%' };
+
   return <div className={styles.studio}>
     <div className={styles.studioHeader}>
       <button className={styles.iconButton} onClick={onClose} title="Geri"><ArrowLeft size={20} /></button>
       <input className={styles.titleInput} value={title} maxLength={180} onChange={(e) => setTitle(e.target.value)} />
-      <select value={format} onChange={(e) => { const nextFormat = e.target.value; setFormat(nextFormat); if (nextFormat === '16:9' && color === '#111827') setColor('#ffffff'); else if (nextFormat !== '16:9' && color === '#ffffff') setColor('#111827'); }}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
+      <select value={format} onChange={(e) => { const nextFormat = e.target.value; setFormat(nextFormat); if (DEFAULT_BACKGROUNDS[nextFormat] && color === '#111827') setColor('#ffffff'); else if (!DEFAULT_BACKGROUNDS[nextFormat] && color === '#ffffff') setColor('#111827'); }}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
       <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={18} /> {documentLoading ? 'PDF hazırlanıyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
       {page?.background && <button className={`${styles.headerButton} ${cropMode ? styles.cropActive : ''}`} onClick={() => { setCropMode((value) => !value); setCropSelection(null); cropSelectionRef.current = null; }} title="Tahta üzerinde kırpılacak alanı sürükleyerek seçin"><Crop size={18} /> {cropMode ? 'Kırpmayı İptal Et' : 'PDF / Görsel Kırp'}</button>}
       {!!page?.backgroundHistory?.length && <button className={styles.headerButton} onClick={undoCrop} title="Son kırpmayı geri al"><RotateCcw size={18} /> Kırpmayı Geri Al</button>}
@@ -551,7 +562,7 @@ function Studio({ onClose, onSaved, initial }) {
         <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
           <canvas className={cropMode ? styles.cropCursor : ''} ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
           {cropMode && cropSelection && <div className={styles.cropSelection} style={{ left: Math.min(cropSelection.start.x, cropSelection.end.x), top: Math.min(cropSelection.start.y, cropSelection.end.y), width: Math.abs(cropSelection.end.x - cropSelection.start.x), height: Math.abs(cropSelection.end.y - cropSelection.start.y) }} />}
-          <video ref={cameraRef} autoPlay muted playsInline className={`${styles.camera} ${cameraOn ? '' : styles.hidden}`} />
+          <video ref={cameraRef} autoPlay muted playsInline style={cameraStyle} className={`${styles.camera} ${cameraOn ? '' : styles.hidden}`} />
         </div>
       </main>
       <aside className={styles.pages}>
