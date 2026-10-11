@@ -118,22 +118,44 @@ function Studio({ onClose, onSaved, initial }) {
   const [documentLoading, setDocumentLoading] = useState(false);
   const [cropMode, setCropMode] = useState(false);
   const [cropSelection, setCropSelection] = useState(null);
+  const [backgroundAsset, setBackgroundAsset] = useState(null);
   const page = pages.find((item) => item.id === pageId) || pages[0];
 
   useEffect(() => {
     currentPageRef.current = page;
+  }, [page]);
+
+  useEffect(() => {
     cropSelectionRef.current = null;
     setCropSelection(null);
     setCropMode(false);
+  }, [pageId, format]);
+
+  useEffect(() => {
     const backgroundSource = page?.background || DEFAULT_BACKGROUNDS[format];
     if (!backgroundSource) {
       backgroundImageRef.current = null;
+      setBackgroundAsset(null);
       return;
     }
+    let cancelled = false;
+    backgroundImageRef.current = null;
+    setBackgroundAsset(null);
     const image = new Image();
-    image.onload = () => { backgroundImageRef.current = image; };
+    image.onload = () => {
+      if (cancelled) return;
+      backgroundImageRef.current = image;
+      setBackgroundAsset({ source: backgroundSource, image });
+    };
+    image.onerror = () => {
+      if (cancelled) return;
+      backgroundImageRef.current = null;
+      setBackgroundAsset(null);
+      toast.error('Tahta arka planı yüklenemedi.');
+    };
     image.src = backgroundSource;
-  }, [page, format]);
+    return () => { cancelled = true; };
+  }, [page?.background, format]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -145,14 +167,12 @@ function Studio({ onClose, onSaved, initial }) {
     const ctx = canvas.getContext('2d');
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, rect.width, rect.height);
-    const paint = () => page.actions.forEach((action) => drawAction(ctx, action));
     const backgroundSource = page.background || DEFAULT_BACKGROUNDS[format];
-    if (backgroundSource) {
-      const image = new Image();
-      image.onload = () => { drawBackground(ctx, image, rect.width, rect.height); paint(); };
-      image.src = backgroundSource;
-    } else paint();
-  }, [page, format]);
+    if (backgroundAsset?.source === backgroundSource && backgroundAsset.image.complete) {
+      drawBackground(ctx, backgroundAsset.image, rect.width, rect.height);
+    }
+    page.actions.forEach((action) => drawAction(ctx, action));
+  }, [page, format, backgroundAsset]);
 
   useEffect(() => { render(); }, [render]);
   useEffect(() => {
