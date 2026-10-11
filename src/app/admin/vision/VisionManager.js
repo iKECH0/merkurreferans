@@ -22,13 +22,15 @@ const TOOL_GROUPS = [
 function drawAction(ctx, action) {
   if (!action.points?.length) return;
   if (action.expiresAt && action.expiresAt <= Date.now()) return;
+  // A laser click without movement should not leave a round pulse on screen.
+  if (action.tool === 'laser' && action.points.length < 2) return;
   const first = action.points[0];
   const last = action.points[action.points.length - 1];
   ctx.save();
   ctx.strokeStyle = action.color;
   ctx.fillStyle = action.color;
   ctx.lineWidth = action.tool === 'highlighter' ? action.size * 3 : action.tool === 'eraser' && !action.eraserDiameter ? action.size * 2 : action.size;
-  ctx.lineCap = action.tool === 'highlighter' ? 'butt' : 'round';
+  ctx.lineCap = ['highlighter', 'laser'].includes(action.tool) ? 'butt' : 'round';
   ctx.lineJoin = 'round';
   const opacity = Math.min(1, Math.max(.1, action.opacity ?? 1));
   const fade = action.expiresAt ? Math.min(1, Math.max(0, (action.expiresAt - Date.now()) / 1000)) : 1;
@@ -47,9 +49,11 @@ function drawAction(ctx, action) {
         ctx.arc(first.x, first.y, ctx.lineWidth / 2, 0, Math.PI * 2);
         ctx.fill();
       }
-    } else if (action.tool === 'highlighter') {
-      // Draw the translucent marker as one continuous stroke. Drawing every
-      // segment separately makes overlapping round caps appear as dark dots.
+    } else if (['highlighter', 'laser'].includes(action.tool)) {
+      // Translucent tools must be a single path. Separate segments expose
+      // overlapping caps as dots while fading. A single laser path also keeps
+      // the complete stroke in place and fades it uniformly instead of making
+      // it look as though it is retracting from one end.
       ctx.beginPath();
       ctx.moveTo(first.x, first.y);
       for (let index = 1; index < action.points.length - 1; index += 1) {
