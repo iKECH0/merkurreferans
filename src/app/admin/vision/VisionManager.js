@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Circle, Crop, Download, Eraser, FileText, Highlighter, ImagePlus, Minus, Pen, Play, Plus, RectangleHorizontal, RotateCcw, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
+import { ArrowLeft, Circle, Crop, Download, Eraser, FileText, Highlighter, ImagePlus, Minus, MousePointer2, Pen, Play, Plus, RectangleHorizontal, RotateCcw, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { upload as uploadBlob } from '@vercel/blob/client';
 import styles from './vision.module.css';
@@ -14,12 +14,14 @@ const DEFAULT_BACKGROUNDS = {
 };
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
 const TOOL_GROUPS = [
+  { title: 'Sunum', tools: [['laser', 'Lazer (1 sn)', MousePointer2]] },
   { title: 'Çizim', tools: [['pen', 'Kalem', Pen], ['highlighter', 'Fosforlu', Highlighter], ['eraser', 'Silgi', Eraser]] },
   { title: 'Şekiller', tools: [['line', 'Çizgi', Minus], ['rectangle', 'Dikdörtgen', RectangleHorizontal], ['circle', 'Daire', Circle]] }
 ];
 
 function drawAction(ctx, action) {
   if (!action.points?.length) return;
+  if (action.expiresAt && action.expiresAt <= Date.now()) return;
   const first = action.points[0];
   const last = action.points[action.points.length - 1];
   ctx.save();
@@ -28,9 +30,15 @@ function drawAction(ctx, action) {
   ctx.lineWidth = action.tool === 'highlighter' ? action.size * 3 : action.tool === 'eraser' && !action.eraserDiameter ? action.size * 2 : action.size;
   ctx.lineCap = action.tool === 'highlighter' ? 'butt' : 'round';
   ctx.lineJoin = 'round';
-  if (action.tool === 'highlighter') ctx.globalAlpha = 0.35;
+  const opacity = Math.min(1, Math.max(.1, action.opacity ?? 1));
+  const fade = action.expiresAt ? Math.min(1, Math.max(0, (action.expiresAt - Date.now()) / 1000)) : 1;
+  ctx.globalAlpha = action.tool === 'highlighter' ? 0.35 * opacity : opacity * fade;
+  if (action.tool === 'laser') {
+    ctx.shadowColor = action.color;
+    ctx.shadowBlur = action.size * 2.5;
+  }
   if (action.tool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
-  if (['pen', 'highlighter', 'eraser'].includes(action.tool)) {
+  if (['pen', 'highlighter', 'eraser', 'laser'].includes(action.tool)) {
     if (action.points.length === 1) {
       ctx.beginPath();
       if (action.tool === 'highlighter') {
@@ -57,11 +65,13 @@ function drawAction(ctx, action) {
         const current = action.points[index];
         const next = action.points[index + 1] || current;
         const midpoint = { x: (current.x + next.x) / 2, y: (current.y + next.y) / 2 };
-        if (action.tool === 'pen') {
+        if (action.tool === 'pen' && action.pressureEnabled !== false) {
           const pressure = Number.isFinite(current.pressure) && current.pressure > 0 ? current.pressure : 0.5;
           const previousPressure = Number.isFinite(action.points[index - 1]?.pressure) ? action.points[index - 1].pressure : pressure;
           const smoothedPressure = previousPressure * .65 + pressure * .35;
-          ctx.lineWidth = action.size * (0.76 + smoothedPressure * 0.48);
+          const pressureRange = action.penStyle === 'fountain' ? 0.8 : action.penStyle === 'technical' ? 0.22 : 0.48;
+          const pressureBase = action.penStyle === 'fountain' ? 0.55 : action.penStyle === 'technical' ? 0.9 : 0.76;
+          ctx.lineWidth = action.size * (pressureBase + smoothedPressure * pressureRange);
         }
         ctx.beginPath();
         ctx.moveTo(segmentStart.x, segmentStart.y);
@@ -167,6 +177,11 @@ function Studio({ onClose, onSaved, initial }) {
   const [penSize, setPenSize] = useState(3);
   const [highlighterSize, setHighlighterSize] = useState(8);
   const [eraserSize, setEraserSize] = useState(32);
+  const [laserSize, setLaserSize] = useState(5);
+  const [strokeOpacity, setStrokeOpacity] = useState(100);
+  const [pressureEnabled, setPressureEnabled] = useState(true);
+  const [penStyle, setPenStyle] = useState('natural');
+  const [laserTick, setLaserTick] = useState(0);
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -179,8 +194,8 @@ function Studio({ onClose, onSaved, initial }) {
   const [cropSelection, setCropSelection] = useState(null);
   const [backgroundAsset, setBackgroundAsset] = useState(null);
   const page = pages.find((item) => item.id === pageId) || pages[0];
-  const activeSize = tool === 'eraser' ? eraserSize : tool === 'highlighter' ? highlighterSize : penSize;
-  const setActiveSize = tool === 'eraser' ? setEraserSize : tool === 'highlighter' ? setHighlighterSize : setPenSize;
+  const activeSize = tool === 'eraser' ? eraserSize : tool === 'highlighter' ? highlighterSize : tool === 'laser' ? laserSize : penSize;
+  const setActiveSize = tool === 'eraser' ? setEraserSize : tool === 'highlighter' ? setHighlighterSize : tool === 'laser' ? setLaserSize : setPenSize;
 
   useEffect(() => {
     currentPageRef.current = page;
@@ -222,6 +237,7 @@ function Studio({ onClose, onSaved, initial }) {
   }, [page?.background, format]);
 
   const render = useCallback(() => {
+    void laserTick;
     const canvas = canvasRef.current;
     if (!canvas || !page) return;
     const rect = canvas.getBoundingClientRect();
@@ -240,9 +256,14 @@ function Studio({ onClose, onSaved, initial }) {
       drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale);
     }
     drawActionsLayer(ctx, page.actions, rect.width, rect.height, ratio);
-  }, [page, format, backgroundAsset]);
+  }, [page, format, backgroundAsset, laserTick]);
 
   useEffect(() => { render(); }, [render]);
+  useEffect(() => {
+    if (!pages.some((item) => item.actions.some((action) => action.tool === 'laser'))) return;
+    const interval = window.setInterval(() => setLaserTick(Date.now()), 50);
+    return () => window.clearInterval(interval);
+  }, [pages]);
   useEffect(() => {
     const listener = () => render();
     window.addEventListener('resize', listener);
@@ -275,7 +296,7 @@ function Studio({ onClose, onSaved, initial }) {
       setCropSelection(selection);
       return;
     }
-    activeRef.current = { id: crypto.randomUUID(), tool, color, size: activeSize, eraserDiameter: tool === 'eraser', points: [point(event)], startTime: Date.now() - startedAt.current };
+    activeRef.current = { id: crypto.randomUUID(), tool, color: tool === 'laser' ? '#ef4444' : color, size: activeSize, opacity: ['eraser', 'laser'].includes(tool) ? 1 : strokeOpacity / 100, pressureEnabled, penStyle, eraserDiameter: tool === 'eraser', points: [point(event)], startTime: Date.now() - startedAt.current };
   };
   const move = (event) => {
     if (cropMode && cropSelectionRef.current) {
@@ -346,8 +367,11 @@ function Studio({ onClose, onSaved, initial }) {
       return;
     }
     if (!activeRef.current) return;
-    const action = { ...activeRef.current, endTime: Date.now() - startedAt.current };
+    const action = { ...activeRef.current, endTime: Date.now() - startedAt.current, ...(activeRef.current.tool === 'laser' ? { expiresAt: Date.now() + 1000 } : {}) };
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), action] } : item));
+    if (action.tool === 'laser') {
+      window.setTimeout(() => setPages((old) => old.map((item) => ({ ...item, actions: item.actions.filter((candidate) => candidate.id !== action.id) }))), 1050);
+    }
     activeRef.current = null;
   };
 
@@ -372,7 +396,8 @@ function Studio({ onClose, onSaved, initial }) {
   const save = async (status) => {
     setSaving(true);
     try {
-      const durationMs = Math.max(0, ...pages.flatMap((item) => item.actions.map((action) => action.endTime || 0)));
+      const persistedPages = pages.map((item) => ({ ...item, actions: item.actions.filter((action) => action.tool !== 'laser') }));
+      const durationMs = Math.max(0, ...persistedPages.flatMap((item) => item.actions.map((action) => action.endTime || 0)));
       let uploadedVideoUrl = videoUrl;
       if (recordedBlob) {
         setUploadProgress(1);
@@ -387,7 +412,7 @@ function Studio({ onClose, onSaved, initial }) {
         setVideoUrl(result.url);
       }
       const cameraLayout = format === '1:1' ? 'bottom-square' : format === '9:16' ? 'bottom-portrait-compact' : 'bottom-compact';
-      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages, currentPageId: pageId, cameraLayout } }) });
+      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages: persistedPages, currentPageId: pageId, cameraLayout } }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Kayıt başarısız.');
       toast.success(status === 'PUBLISHED' ? 'İçerik yayımlandı.' : 'Taslak kaydedildi.');
@@ -645,14 +670,26 @@ function Studio({ onClose, onSaved, initial }) {
           <div className={styles.colorGrid}>{COLORS.map((item) => <button key={item} aria-label={item} className={`${styles.color} ${color === item ? styles.activeColor : ''}`} style={{ background: item }} onClick={() => setColor(item)} />)}</div>
         </section>
         <section className={styles.toolSection}>
-          <div className={styles.rangeLabel}><p>{tool === 'eraser' ? 'Silgi Boyutu' : tool === 'highlighter' ? 'Fosforlu Kalınlığı' : 'Kalem Hassasiyeti'}</p><span>{activeSize}px</span></div>
+          <div className={styles.rangeLabel}><p>{tool === 'eraser' ? 'Silgi Boyutu' : tool === 'highlighter' ? 'Fosforlu Kalınlığı' : tool === 'laser' ? 'Lazer Kalınlığı' : 'Kalem Hassasiyeti'}</p><span>{activeSize}px</span></div>
           <input className={styles.sizeRange} aria-label={tool === 'eraser' ? 'Silgi boyutu' : 'Çizgi kalınlığı'} type="range" min={tool === 'eraser' ? 8 : 1} max={tool === 'eraser' ? 80 : tool === 'highlighter' ? 24 : 12} step={tool === 'pen' ? .5 : 1} value={activeSize} onChange={(e) => setActiveSize(Number(e.target.value))} />
           <div className={styles.strokePreview}><span className={tool === 'eraser' ? styles.eraserPreview : ''} style={{ width: Math.min(64, activeSize * 2), height: tool === 'eraser' ? Math.min(22, Math.max(8, activeSize / 3)) : Math.max(2, activeSize / 2), background: tool === 'eraser' ? '#fff' : color }} /></div>
           <div className={styles.presetRow}>
-            {(tool === 'eraser' ? [[12, 'Küçük'], [32, 'Orta'], [64, 'Büyük']] : tool === 'highlighter' ? [[5, 'İnce'], [10, 'Orta'], [18, 'Kalın']] : [[1.5, 'İnce'], [3, 'Normal'], [6, 'Kalın']]).map(([value, label]) => <button key={value} className={activeSize === value ? styles.activePreset : ''} onClick={() => setActiveSize(value)}>{label}</button>)}
+            {(tool === 'eraser' ? [[12, 'Küçük'], [32, 'Orta'], [64, 'Büyük']] : tool === 'highlighter' ? [[5, 'İnce'], [10, 'Orta'], [18, 'Kalın']] : tool === 'laser' ? [[3, 'İnce'], [5, 'Normal'], [9, 'Kalın']] : [[1.5, 'İnce'], [3, 'Normal'], [6, 'Kalın']]).map(([value, label]) => <button key={value} className={activeSize === value ? styles.activePreset : ''} onClick={() => setActiveSize(value)}>{label}</button>)}
           </div>
-          {tool === 'pen' && <div className={styles.sensitivityNote}><span className={styles.statusDot} /> Yüksek hassasiyet ve basınç desteği açık</div>}
+          {tool === 'pen' && <div className={styles.sensitivityNote}><span className={styles.statusDot} /> Yüksek hassasiyet açık · Basınç {pressureEnabled ? 'açık' : 'kapalı'}</div>}
+          {tool === 'laser' && <div className={styles.laserNote}><span className={styles.laserDot} /> Çizgi 1 saniye içinde yumuşakça kaybolur</div>}
         </section>
+        {tool === 'pen' && <section className={styles.toolSection}>
+          <p>Kalem Karakteri</p>
+          <div className={styles.segmentedControl}>
+            {[['technical', 'Teknik'], ['natural', 'Doğal'], ['fountain', 'Dolma']].map(([value, label]) => <button key={value} className={penStyle === value ? styles.segmentActive : ''} onClick={() => setPenStyle(value)}>{label}</button>)}
+          </div>
+          <label className={styles.switchRow}><span><strong>Basınç Duyarlılığı</strong><small>Tablet kalemine göre kalınlaşır</small></span><input type="checkbox" checked={pressureEnabled} onChange={(e) => setPressureEnabled(e.target.checked)} /><i /></label>
+        </section>}
+        {!['eraser', 'laser'].includes(tool) && <section className={styles.toolSection}>
+          <div className={styles.rangeLabel}><p>Opaklık</p><span>%{strokeOpacity}</span></div>
+          <input className={styles.sizeRange} aria-label="Çizgi opaklığı" type="range" min="20" max="100" step="5" value={strokeOpacity} onChange={(e) => setStrokeOpacity(Number(e.target.value))} />
+        </section>}
         {page.background && <section className={styles.toolSection}>
           <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
           <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="50" max="180" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
