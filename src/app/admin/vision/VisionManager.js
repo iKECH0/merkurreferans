@@ -6,7 +6,8 @@ import toast from 'react-hot-toast';
 import { upload as uploadBlob } from '@vercel/blob/client';
 import styles from './vision.module.css';
 
-const COLORS = ['#111827', '#ef4444', '#2563eb', '#16a34a', '#9333ea', '#f59e0b'];
+const COLORS = ['#111827', '#ffffff', '#ef4444', '#2563eb', '#16a34a', '#9333ea', '#f59e0b'];
+const DEFAULT_BACKGROUNDS = { '16:9': '/vision/merkur-vizyon-horizontal.jpeg' };
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
 const TOOL_GROUPS = [
   { title: 'Çizim', tools: [['pen', 'Kalem', Pen], ['highlighter', 'Fosforlu', Highlighter], ['eraser', 'Silgi', Eraser]] },
@@ -102,7 +103,7 @@ function Studio({ onClose, onSaved, initial }) {
   const [pages, setPages] = useState(initialData.pages?.length ? initialData.pages : [emptyPage()]);
   const [pageId, setPageId] = useState(initialData.currentPageId || initialData.pages?.[0]?.id);
   const [tool, setTool] = useState('pen');
-  const [color, setColor] = useState('#111827');
+  const [color, setColor] = useState(initial?.format === '16:9' ? '#ffffff' : '#111827');
   const [size, setSize] = useState(4);
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
@@ -121,14 +122,15 @@ function Studio({ onClose, onSaved, initial }) {
     cropSelectionRef.current = null;
     setCropSelection(null);
     setCropMode(false);
-    if (!page?.background) {
+    const backgroundSource = page?.background || DEFAULT_BACKGROUNDS[format];
+    if (!backgroundSource) {
       backgroundImageRef.current = null;
       return;
     }
     const image = new Image();
     image.onload = () => { backgroundImageRef.current = image; };
-    image.src = page.background;
-  }, [page]);
+    image.src = backgroundSource;
+  }, [page, format]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -141,12 +143,13 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, rect.width, rect.height);
     const paint = () => page.actions.forEach((action) => drawAction(ctx, action));
-    if (page.background) {
+    const backgroundSource = page.background || DEFAULT_BACKGROUNDS[format];
+    if (backgroundSource) {
       const image = new Image();
       image.onload = () => { drawBackground(ctx, image, rect.width, rect.height); paint(); };
-      image.src = page.background;
+      image.src = backgroundSource;
     } else paint();
-  }, [page]);
+  }, [page, format]);
 
   useEffect(() => { render(); }, [render]);
   useEffect(() => {
@@ -512,7 +515,7 @@ function Studio({ onClose, onSaved, initial }) {
     <div className={styles.studioHeader}>
       <button className={styles.iconButton} onClick={onClose} title="Geri"><ArrowLeft size={20} /></button>
       <input className={styles.titleInput} value={title} maxLength={180} onChange={(e) => setTitle(e.target.value)} />
-      <select value={format} onChange={(e) => setFormat(e.target.value)}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
+      <select value={format} onChange={(e) => { const nextFormat = e.target.value; setFormat(nextFormat); if (nextFormat === '16:9' && color === '#111827') setColor('#ffffff'); else if (nextFormat !== '16:9' && color === '#ffffff') setColor('#111827'); }}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
       <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={18} /> {documentLoading ? 'PDF hazırlanıyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
       {page?.background && <button className={`${styles.headerButton} ${cropMode ? styles.cropActive : ''}`} onClick={() => { setCropMode((value) => !value); setCropSelection(null); cropSelectionRef.current = null; }} title="Tahta üzerinde kırpılacak alanı sürükleyerek seçin"><Crop size={18} /> {cropMode ? 'Kırpmayı İptal Et' : 'PDF / Görsel Kırp'}</button>}
       {!!page?.backgroundHistory?.length && <button className={styles.headerButton} onClick={undoCrop} title="Son kırpmayı geri al"><RotateCcw size={18} /> Kırpmayı Geri Al</button>}
