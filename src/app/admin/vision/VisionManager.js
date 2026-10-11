@@ -21,15 +21,31 @@ function drawAction(ctx, action) {
   ctx.strokeStyle = action.color;
   ctx.fillStyle = action.color;
   ctx.lineWidth = action.tool === 'highlighter' ? action.size * 3 : action.tool === 'eraser' ? action.size * 2 : action.size;
-  ctx.lineCap = 'round';
+  ctx.lineCap = action.tool === 'highlighter' ? 'butt' : 'round';
   ctx.lineJoin = 'round';
   if (action.tool === 'highlighter') ctx.globalAlpha = 0.35;
   if (action.tool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
   if (['pen', 'highlighter', 'eraser'].includes(action.tool)) {
     if (action.points.length === 1) {
       ctx.beginPath();
-      ctx.arc(first.x, first.y, ctx.lineWidth / 2, 0, Math.PI * 2);
-      ctx.fill();
+      if (action.tool === 'highlighter') {
+        ctx.fillRect(first.x - ctx.lineWidth / 2, first.y - ctx.lineWidth / 2, ctx.lineWidth, ctx.lineWidth);
+      } else {
+        ctx.arc(first.x, first.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (action.tool === 'highlighter') {
+      // Draw the translucent marker as one continuous stroke. Drawing every
+      // segment separately makes overlapping round caps appear as dark dots.
+      ctx.beginPath();
+      ctx.moveTo(first.x, first.y);
+      for (let index = 1; index < action.points.length - 1; index += 1) {
+        const current = action.points[index];
+        const next = action.points[index + 1];
+        ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+      }
+      ctx.lineTo(last.x, last.y);
+      ctx.stroke();
     } else {
       let segmentStart = first;
       for (let index = 1; index < action.points.length; index += 1) {
