@@ -130,6 +130,19 @@ function drawQuestionImage(ctx, image, width, height, format, questionScale) {
   ctx.restore();
 }
 
+function drawActionsLayer(ctx, actions, width, height, pixelRatio = 1) {
+  const ratio = Math.max(1, Math.min(3, pixelRatio || 1));
+  const layer = document.createElement('canvas');
+  layer.width = Math.max(1, Math.round(width * ratio));
+  layer.height = Math.max(1, Math.round(height * ratio));
+  const layerContext = layer.getContext('2d');
+  layerContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+  layerContext.imageSmoothingEnabled = true;
+  layerContext.imageSmoothingQuality = 'high';
+  actions?.forEach((action) => drawAction(layerContext, action));
+  ctx.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, width, height);
+}
+
 function Studio({ onClose, onSaved, initial }) {
   const canvasRef = useRef(null);
   const cameraRef = useRef(null);
@@ -226,7 +239,7 @@ function Studio({ onClose, onSaved, initial }) {
     if (backgroundAsset?.questionSource === questionSource && backgroundAsset.questionImage?.complete) {
       drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale);
     }
-    page.actions.forEach((action) => drawAction(ctx, action));
+    drawActionsLayer(ctx, page.actions, rect.width, rect.height, ratio);
   }, [page, format, backgroundAsset]);
 
   useEffect(() => { render(); }, [render]);
@@ -465,7 +478,7 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
     if (brandImage?.complete) drawBackground(ctx, brandImage, canvasRect.width, canvasRect.height);
     if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format, livePage?.questionScale);
-    livePage?.actions?.forEach((action) => drawAction(ctx, action));
+    drawActionsLayer(ctx, livePage?.actions, canvasRect.width, canvasRect.height, Math.min(2, output.width / canvasRect.width));
     ctx.restore();
     if (video?.readyState >= 2) {
       const squareCamera = format === '1:1';
