@@ -1,13 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Circle, Download, Eraser, Highlighter, ImagePlus, Minus, Pen, Play, Plus, RectangleHorizontal, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
+import { ArrowLeft, Circle, Download, Eraser, FileText, Highlighter, ImagePlus, Minus, Pen, Play, Plus, RectangleHorizontal, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { upload as uploadBlob } from '@vercel/blob/client';
 import styles from './vision.module.css';
 
 const COLORS = ['#111827', '#ef4444', '#2563eb', '#16a34a', '#9333ea', '#f59e0b'];
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
+const TOOL_GROUPS = [
+  { title: 'Çizim', tools: [['pen', 'Kalem', Pen], ['highlighter', 'Fosforlu', Highlighter], ['eraser', 'Silgi', Eraser]] },
+  { title: 'Şekiller', tools: [['line', 'Çizgi', Minus], ['rectangle', 'Dikdörtgen', RectangleHorizontal], ['circle', 'Daire', Circle]] }
+];
 
 function drawAction(ctx, action) {
   if (!action.points?.length) return;
@@ -55,6 +59,14 @@ function drawAction(ctx, action) {
   ctx.restore();
 }
 
+function drawBackground(ctx, image, width, height) {
+  if (!image?.width || !image?.height) return;
+  const scale = Math.min(width / image.width, height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+}
+
 function Studio({ onClose, onSaved, initial }) {
   const canvasRef = useRef(null);
   const cameraRef = useRef(null);
@@ -79,6 +91,7 @@ function Studio({ onClose, onSaved, initial }) {
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [videoUrl, setVideoUrl] = useState(initial?.videoUrl || null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [documentLoading, setDocumentLoading] = useState(false);
   const page = pages.find((item) => item.id === pageId) || pages[0];
 
   useEffect(() => {
@@ -105,7 +118,7 @@ function Studio({ onClose, onSaved, initial }) {
     const paint = () => page.actions.forEach((action) => drawAction(ctx, action));
     if (page.background) {
       const image = new Image();
-      image.onload = () => { ctx.drawImage(image, 0, 0, rect.width, rect.height); paint(); };
+      image.onload = () => { drawBackground(ctx, image, rect.width, rect.height); paint(); };
       image.src = page.background;
     } else paint();
   }, [page]);
@@ -178,14 +191,56 @@ function Studio({ onClose, onSaved, initial }) {
     } catch (error) { toast.error(error.message); } finally { setSaving(false); setUploadProgress(0); }
   };
 
-  const handleImageUpload = (event) => {
+  const handleDocumentUpload = async (event) => {
     const file = event.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return toast.error('Lütfen bir görsel seçin.');
-    if (file.size > 4 * 1024 * 1024) return toast.error('Görsel en fazla 4 MB olabilir.');
-    const reader = new FileReader();
-    reader.onload = () => setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result } : item));
-    reader.readAsDataURL(file);
     event.target.value = '';
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) return toast.error('Dosya en fazla 15 MB olabilir.');
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result } : item));
+      reader.readAsDataURL(file);
+      return;
+    }
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return toast.error('Lütfen bir görsel veya PDF seçin.');
+    setDocumentLoading(true);
+    try {
+      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+      const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+      if (pdf.numPages > 20) throw new Error('PDF en fazla 20 sayfa olabilir.');
+      const importedPages = [];
+      let estimatedPayloadSize = 0;
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const pdfPage = await pdf.getPage(pageNumber);
+        const naturalViewport = pdfPage.getViewport({ scale: 1 });
+        const scale = Math.min(2, 1500 / Math.max(naturalViewport.width, naturalViewport.height));
+        const viewport = pdfPage.getViewport({ scale });
+        const pdfCanvas = document.createElement('canvas');
+        pdfCanvas.width = Math.ceil(viewport.width);
+        pdfCanvas.height = Math.ceil(viewport.height);
+        const context = pdfCanvas.getContext('2d', { alpha: false });
+        context.fillStyle = '#ffffff'; context.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+        await pdfPage.render({ canvasContext: context, viewport }).promise;
+        const background = pdfCanvas.toDataURL('image/jpeg', 0.84);
+        estimatedPayloadSize += background.length;
+        if (estimatedPayloadSize > 6.5 * 1024 * 1024) throw new Error('PDF içeriği kaydetme sınırını aşıyor. Daha küçük bir PDF deneyin.');
+        importedPages.push({
+          id: crypto.randomUUID(),
+          title: `${file.name.replace(/\.pdf$/i, '')} · ${pageNumber}`,
+          actions: [],
+          background
+        });
+      }
+      setPages((old) => [...old, ...importedPages]);
+      setPageId(importedPages[0].id);
+      toast.success(`${importedPages.length} PDF sayfası tahtaya eklendi.`);
+    } catch (error) {
+      console.error('PDF import failed:', error);
+      toast.error(error.message || 'PDF eklenemedi.');
+    } finally {
+      setDocumentLoading(false);
+    }
   };
 
   const toggleCamera = async () => {
@@ -215,7 +270,7 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.scale(output.width / canvasRect.width, output.height / canvasRect.height);
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
-    if (backgroundImage?.complete) ctx.drawImage(backgroundImage, 0, 0, canvasRect.width, canvasRect.height);
+    if (backgroundImage?.complete) drawBackground(ctx, backgroundImage, canvasRect.width, canvasRect.height);
     livePage?.actions?.forEach((action) => drawAction(ctx, action));
     ctx.restore();
     if (video?.readyState >= 2) {
@@ -279,13 +334,12 @@ function Studio({ onClose, onSaved, initial }) {
     link.click();
   };
 
-  const tools = [['pen', Pen], ['highlighter', Highlighter], ['eraser', Eraser], ['line', Minus], ['rectangle', RectangleHorizontal], ['circle', Circle]];
   return <div className={styles.studio}>
     <div className={styles.studioHeader}>
       <button className={styles.iconButton} onClick={onClose} title="Geri"><ArrowLeft size={20} /></button>
       <input className={styles.titleInput} value={title} maxLength={180} onChange={(e) => setTitle(e.target.value)} />
       <select value={format} onChange={(e) => setFormat(e.target.value)}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
-      <label className={styles.headerButton}><ImagePlus size={18} /> Görsel<input hidden type="file" accept="image/*" onChange={handleImageUpload} /></label>
+      <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={18} /> {documentLoading ? 'PDF hazırlanıyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
       <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={18} /> : <Video size={18} />} Kamera</button>
       <button title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isRecording ? 'Kaydı Bitir' : 'Kayıt Başlat'}</button>
       {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo}><Download size={18} /> Videoyu indir</button>}
@@ -295,12 +349,24 @@ function Studio({ onClose, onSaved, initial }) {
     </div>
     <div className={styles.workspace}>
       <aside className={styles.toolbar}>
-        {tools.map(([name, Icon]) => <button key={name} title={name} className={tool === name ? styles.activeTool : ''} onClick={() => setTool(name)}><Icon size={20} /></button>)}
-        <hr />
-        {COLORS.map((item) => <button key={item} aria-label={item} className={styles.color} style={{ background: item, outline: color === item ? '3px solid #60a5fa' : 'none' }} onClick={() => setColor(item)} />)}
-        <input aria-label="Kalınlık" type="range" min="2" max="24" value={size} onChange={(e) => setSize(Number(e.target.value))} />
-        <button title="Geri al" onClick={() => setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: item.actions.slice(0, -1) } : item))}><Undo2 size={20} /></button>
-        <button title="Temizle" onClick={() => confirm('Bu sayfa temizlensin mi?') && setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [], background: null } : item))}><Trash2 size={20} /></button>
+        <div className={styles.toolbarBrand}><div className={styles.toolbarBrandIcon}><Pen size={18} /></div><div><strong>Kalem Paneli</strong><span>Çizim araçları</span></div></div>
+        {TOOL_GROUPS.map((group) => <section className={styles.toolSection} key={group.title}>
+          <p>{group.title}</p>
+          <div className={styles.toolGrid}>{group.tools.map(([name, label, Icon]) => <button key={name} title={label} className={tool === name ? styles.activeTool : ''} onClick={() => setTool(name)}><Icon size={19} /><span>{label}</span></button>)}</div>
+        </section>)}
+        <section className={styles.toolSection}>
+          <p>Renk</p>
+          <div className={styles.colorGrid}>{COLORS.map((item) => <button key={item} aria-label={item} className={`${styles.color} ${color === item ? styles.activeColor : ''}`} style={{ background: item }} onClick={() => setColor(item)} />)}</div>
+        </section>
+        <section className={styles.toolSection}>
+          <div className={styles.rangeLabel}><p>Kalınlık</p><span>{size}px</span></div>
+          <input className={styles.sizeRange} aria-label="Kalınlık" type="range" min="2" max="24" value={size} onChange={(e) => setSize(Number(e.target.value))} />
+          <div className={styles.strokePreview}><span style={{ width: Math.min(46, size * 2), height: Math.max(2, size / 2), background: color }} /></div>
+        </section>
+        <section className={styles.toolSection}>
+          <p>İşlemler</p>
+          <div className={styles.actionGrid}><button title="Geri al" onClick={() => setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: item.actions.slice(0, -1) } : item))}><Undo2 size={19} /><span>Geri Al</span></button><button className={styles.clearTool} title="Temizle" onClick={() => confirm('Bu sayfa temizlensin mi?') && setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [], background: null } : item))}><Trash2 size={19} /><span>Temizle</span></button></div>
+        </section>
       </aside>
       <main className={styles.canvasArea}>
         <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
