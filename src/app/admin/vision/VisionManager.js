@@ -74,6 +74,8 @@ function Studio({ onClose, onSaved, initial }) {
   const activeRef = useRef(null);
   const recorderRef = useRef(null);
   const recordingFrameRef = useRef(null);
+  const recordingOutputStreamRef = useRef(null);
+  const recordingSessionRef = useRef(0);
   const currentPageRef = useRef(null);
   const backgroundImageRef = useRef(null);
   const startedAt = useRef(Date.now());
@@ -88,6 +90,7 @@ function Studio({ onClose, onSaved, initial }) {
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [videoUrl, setVideoUrl] = useState(initial?.videoUrl || null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -130,6 +133,9 @@ function Studio({ onClose, onSaved, initial }) {
     return () => window.removeEventListener('resize', listener);
   }, [render]);
   useEffect(() => () => {
+    recordingSessionRef.current += 1;
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+    recordingOutputStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
     streamRef.current?.getTracks().forEach((track) => track.stop());
     if (recordingFrameRef.current) cancelAnimationFrame(recordingFrameRef.current);
   }, []);
@@ -289,32 +295,92 @@ function Studio({ onClose, onSaved, initial }) {
 
   const startRecording = async () => {
     if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast.error('Tarayıcınız video kaydını desteklemiyor.');
-    let cameraStream = streamRef.current;
-    if (!cameraStream) cameraStream = await toggleCamera();
-    if (!cameraStream) return;
-    const dimensions = format === '9:16' ? [1080, 1920] : format === '1:1' ? [1440, 1440] : [1920, 1080];
-    const output = document.createElement('canvas'); output.width = dimensions[0]; output.height = dimensions[1];
-    const composedStream = output.captureStream(30);
-    cameraStream.getAudioTracks().forEach((track) => composedStream.addTrack(track));
-    const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((type) => MediaRecorder.isTypeSupported(type));
-    const recorder = new MediaRecorder(composedStream, {
-      mimeType,
-      videoBitsPerSecond: format === '9:16' ? 8000000 : 6500000,
-      audioBitsPerSecond: 128000
-    });
-    const chunks = [];
-    recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
-    recorder.onstop = () => {
+    if (isRecording || isFinalizingRecording) return;
+    try {
+      let cameraStream = streamRef.current;
+      const hasLiveVideo = cameraStream?.getVideoTracks().some((track) => track.readyState === 'live');
+      const hasLiveAudio = cameraStream?.getAudioTracks().some((track) => track.readyState === 'live');
+      if (!cameraStream?.active || !hasLiveVideo || !hasLiveAudio) {
+        cameraStream?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        setCameraOn(false);
+        cameraStream = await toggleCamera();
+      }
+      if (!cameraStream?.active) throw new Error('Kamera ve mikrofon akışı başlatılamadı.');
+      if (cameraRef.current?.readyState < 2) {
+        await new Promise((resolve, reject) => {
+          const timeout = window.setTimeout(() => reject(new Error('Kamera görüntüsü hazırlanamadı.')), 5000);
+          cameraRef.current.addEventListener('loadeddata', () => { window.clearTimeout(timeout); resolve(); }, { once: true });
+        });
+      }
+
       if (recordingFrameRef.current) cancelAnimationFrame(recordingFrameRef.current);
-      setRecordedBlob(new Blob(chunks, { type: 'video/webm' }));
+      recordingOutputStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+      const sessionId = recordingSessionRef.current + 1;
+      recordingSessionRef.current = sessionId;
+      const dimensions = format === '9:16' ? [1080, 1920] : format === '1:1' ? [1440, 1440] : [1920, 1080];
+      const output = document.createElement('canvas'); output.width = dimensions[0]; output.height = dimensions[1];
+      const composedStream = output.captureStream(30);
+      cameraStream.getAudioTracks().filter((track) => track.readyState === 'live').forEach((track) => composedStream.addTrack(track));
+      recordingOutputStreamRef.current = composedStream;
+      const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((type) => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error('Tarayıcınızda desteklenen video kodlayıcı bulunamadı.');
+      const recorder = new MediaRecorder(composedStream, {
+        mimeType,
+        videoBitsPerSecond: format === '9:16' ? 8000000 : 6500000,
+        audioBitsPerSecond: 128000
+      });
+      const chunks = [];
+      const finish = () => {
+        if (recordingFrameRef.current) cancelAnimationFrame(recordingFrameRef.current);
+        composedStream.getVideoTracks().forEach((track) => track.stop());
+        if (recordingSessionRef.current !== sessionId) return;
+        recorderRef.current = null;
+        recordingOutputStreamRef.current = null;
+        setIsRecording(false);
+        setIsFinalizingRecording(false);
+      };
+      recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
+      recorder.onerror = (event) => {
+        finish();
+        console.error('Vision MediaRecorder error:', event.error || event);
+        toast.error('Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+      };
+      recorder.onstop = () => {
+        finish();
+        if (!chunks.length) return toast.error('Video verisi oluşturulamadı. Lütfen kaydı tekrar başlatın.');
+        setRecordedBlob(new Blob(chunks, { type: mimeType }));
+        toast.success('Yeni kamera ve tahta kaydı hazır. Tekrar kayıt alabilir veya videoyu kaydedebilirsiniz.');
+      };
+      const frame = () => {
+        if (recordingSessionRef.current !== sessionId || recorder.state === 'inactive') return;
+        drawCompositeFrame(output, canvasRef.current, cameraRef.current);
+        recordingFrameRef.current = requestAnimationFrame(frame);
+      };
+      recorderRef.current = recorder;
+      setRecordedBlob(null);
+      setIsFinalizingRecording(false);
+      recorder.start(500);
+      setIsRecording(true);
+      frame();
+    } catch (error) {
+      recorderRef.current = null;
+      recordingOutputStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+      recordingOutputStreamRef.current = null;
       setIsRecording(false);
-      toast.success('Kamera ve tahta kaydı hazır. Kaydet ve Yayımla ile sisteme aktarabilirsiniz.');
-    };
-    const frame = () => { drawCompositeFrame(output, canvasRef.current, cameraRef.current); recordingFrameRef.current = requestAnimationFrame(frame); };
-    recorderRef.current = recorder; recorder.start(1000); frame(); setIsRecording(true); setRecordedBlob(null);
+      setIsFinalizingRecording(false);
+      console.error('Vision recording could not start:', error);
+      toast.error(error.message || 'Kayıt başlatılamadı.');
+    }
   };
 
-  const stopRecording = () => recorderRef.current?.state === 'recording' && recorderRef.current.stop();
+  const stopRecording = () => {
+    const recorder = recorderRef.current;
+    if (recorder?.state !== 'recording') return;
+    setIsFinalizingRecording(true);
+    try { recorder.requestData(); } catch {}
+    recorder.stop();
+  };
 
   const downloadVideo = () => {
     if (recordedBlob) {
@@ -341,11 +407,11 @@ function Studio({ onClose, onSaved, initial }) {
       <select value={format} onChange={(e) => setFormat(e.target.value)}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
       <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={18} /> {documentLoading ? 'PDF hazırlanıyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
       <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={18} /> : <Video size={18} />} Kamera</button>
-      <button title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isRecording ? 'Kaydı Bitir' : 'Kayıt Başlat'}</button>
+      <button disabled={isFinalizingRecording} title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isFinalizingRecording ? 'Video hazırlanıyor…' : isRecording ? 'Kaydı Bitir' : recordedBlob ? 'Yeni Kayıt Başlat' : 'Kayıt Başlat'}</button>
       {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo}><Download size={18} /> Videoyu indir</button>}
       <button className={styles.headerButton} onClick={downloadImage}><Download size={18} /> PNG indir</button>
-      <button disabled={saving || isRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')}><Save size={18} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</button>
-      <button disabled={saving || isRecording || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')}><Save size={18} /> {saving && uploadProgress ? `Video yükleniyor %${uploadProgress}` : 'Kaydet ve Yayımla'}</button>
+      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')}><Save size={18} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</button>
+      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')}><Save size={18} /> {saving && uploadProgress ? `Video yükleniyor %${uploadProgress}` : 'Kaydet ve Yayımla'}</button>
     </div>
     <div className={styles.workspace}>
       <aside className={styles.toolbar}>
