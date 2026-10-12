@@ -104,7 +104,7 @@ function drawBackground(ctx, image, width, height) {
   ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
-function getQuestionImageRect(image, width, height, format, requestedScale = 1.25) {
+function getQuestionImageRect(image, width, height, format, requestedScale = 1.25, positionX = 0, positionY = 0) {
   const regions = {
     '16:9': { x: width * .19, y: height * .23, width: width * .74, height: height * .33 },
     '9:16': { x: width * .08, y: height * .25, width: width * .84, height: height * .46 },
@@ -112,24 +112,27 @@ function getQuestionImageRect(image, width, height, format, requestedScale = 1.2
   };
   const region = regions[format] || { x: width * .07, y: height * .09, width: width * .86, height: height * .82 };
   const fitScale = Math.min(region.width / image.width, region.height / image.height);
-  const questionScale = Math.min(1.8, Math.max(.5, Number(requestedScale) || 1.25));
+  const questionScale = Math.min(2.2, Math.max(.5, Number(requestedScale) || 1.25));
   const maxScale = Math.min(width * .94 / image.width, height * .86 / image.height);
   const scale = Math.min(fitScale * questionScale, maxScale);
   const drawWidth = image.width * scale;
   const drawHeight = image.height * scale;
-  const centerX = region.x + region.width / 2;
-  const centerY = region.y + region.height / 2;
+  const offsetX = Math.min(50, Math.max(-50, Number(positionX) || 0)) / 100 * width * .55;
+  const offsetY = Math.min(50, Math.max(-50, Number(positionY) || 0)) / 100 * height * .55;
+  const centerX = region.x + region.width / 2 + offsetX;
+  const centerY = region.y + region.height / 2 + offsetY;
+  const margin = Math.max(8, Math.min(width, height) * .025);
   return {
-    x: centerX - drawWidth / 2,
-    y: centerY - drawHeight / 2,
+    x: Math.min(width - drawWidth - margin, Math.max(margin, centerX - drawWidth / 2)),
+    y: Math.min(height - drawHeight - margin, Math.max(margin, centerY - drawHeight / 2)),
     width: drawWidth,
     height: drawHeight
   };
 }
 
-function drawQuestionImage(ctx, image, width, height, format, questionScale) {
+function drawQuestionImage(ctx, image, width, height, format, questionScale, questionX, questionY) {
   if (!image?.width || !image?.height) return;
-  const rect = getQuestionImageRect(image, width, height, format, questionScale);
+  const rect = getQuestionImageRect(image, width, height, format, questionScale, questionX, questionY);
   const padding = Math.max(8, Math.min(width, height) * .012);
   const radius = Math.max(10, Math.min(width, height) * .018);
   ctx.save();
@@ -257,7 +260,7 @@ function Studio({ onClose, onSaved, initial }) {
       drawBackground(ctx, backgroundAsset.brandImage, rect.width, rect.height);
     }
     if (backgroundAsset?.questionSource === questionSource && backgroundAsset.questionImage?.complete) {
-      drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale);
+      drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale, page.questionX, page.questionY);
     }
     drawActionsLayer(ctx, page.actions, rect.width, rect.height, ratio);
   }, [page, format, backgroundAsset, laserTick]);
@@ -325,7 +328,7 @@ function Studio({ onClose, onSaved, initial }) {
     const image = backgroundImageRef.current;
     if (!canvas || !image?.width || !image?.height || !selection) return toast.error('PDF sayfası henüz hazırlanıyor. Birkaç saniye sonra tekrar deneyin.');
     const rect = canvas.getBoundingClientRect();
-    const questionRect = getQuestionImageRect(image, rect.width, rect.height, format, page.questionScale);
+    const questionRect = getQuestionImageRect(image, rect.width, rect.height, format, page.questionScale, page.questionX, page.questionY);
     const displayScale = questionRect.width / image.width;
     const displayWidth = questionRect.width;
     const displayHeight = questionRect.height;
@@ -396,6 +399,9 @@ function Studio({ onClose, onSaved, initial }) {
   const setQuestionScale = (questionScale) => {
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, questionScale } : item));
   };
+  const setQuestionLayout = (changes) => {
+    setPages((old) => old.map((item) => item.id === page.id ? { ...item, ...changes } : item));
+  };
 
   const save = async (status) => {
     setSaving(true);
@@ -415,7 +421,7 @@ function Studio({ onClose, onSaved, initial }) {
         uploadedVideoUrl = result.url;
         setVideoUrl(result.url);
       }
-      const cameraLayout = format === '1:1' ? 'bottom-square' : format === '9:16' ? 'bottom-portrait-compact' : 'bottom-compact';
+      const cameraLayout = 'top-right-compact';
       const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages: persistedPages, currentPageId: pageId, cameraLayout } }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Kayıt başarısız.');
@@ -506,16 +512,16 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
     if (brandImage?.complete) drawBackground(ctx, brandImage, canvasRect.width, canvasRect.height);
-    if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format, livePage?.questionScale);
+    if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format, livePage?.questionScale, livePage?.questionX, livePage?.questionY);
     drawActionsLayer(ctx, livePage?.actions, canvasRect.width, canvasRect.height, Math.min(2, output.width / canvasRect.width));
     ctx.restore();
     if (video?.readyState >= 2) {
       const squareCamera = format === '1:1';
       const portraitCamera = format === '9:16';
-      const x = Math.round(output.width * (squareCamera ? .34 : portraitCamera ? .15 : .31));
-      const y = Math.round(output.height * (squareCamera ? .65 : portraitCamera ? .75 : .59));
-      const width = Math.round(output.width * (squareCamera ? .32 : portraitCamera ? .70 : .38));
-      const height = Math.round(output.height * (squareCamera ? .32 : portraitCamera ? .22 : .38));
+      const x = Math.round(output.width * (squareCamera ? .69 : portraitCamera ? .61 : .73));
+      const y = Math.round(output.height * (squareCamera ? .05 : .08));
+      const width = Math.round(output.width * (squareCamera ? .26 : portraitCamera ? .33 : .23));
+      const height = Math.round(output.height * (squareCamera ? .26 : portraitCamera ? .18 : .31));
       const sourceRatio = video.videoWidth / video.videoHeight, targetRatio = width / height;
       let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
       if (sourceRatio > targetRatio) { sw = video.videoHeight * targetRatio; sx = (video.videoWidth - sw) / 2; }
@@ -642,10 +648,10 @@ function Studio({ onClose, onSaved, initial }) {
   };
 
   const cameraStyle = format === '1:1'
-    ? { left: '34%', bottom: '3%', width: '32%', height: '32%' }
+    ? { right: '5%', top: '5%', width: '26%', height: '26%' }
     : format === '9:16'
-      ? { left: '15%', bottom: '3%', width: '70%', height: '22%' }
-      : { left: '31%', bottom: '3%', width: '38%', height: '38%' };
+      ? { right: '6%', top: '8%', width: '33%', height: '18%' }
+      : { right: '4%', top: '6%', width: '23%', height: '31%' };
 
   return <div className={styles.studio}>
     <div className={styles.studioHeader}>
@@ -696,9 +702,13 @@ function Studio({ onClose, onSaved, initial }) {
         </section>}
         {page.background && <section className={styles.toolSection}>
           <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
-          <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="50" max="180" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
+          <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="50" max="220" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
+          <div className={styles.rangeLabel}><p>Yatay Konum</p><span>{page.questionX || 0}</span></div>
+          <input className={styles.sizeRange} aria-label="Soru görseli yatay konumu" type="range" min="-50" max="50" step="1" value={page.questionX || 0} onChange={(e) => setQuestionLayout({ questionX: Number(e.target.value) })} />
+          <div className={styles.rangeLabel}><p>Dikey Konum</p><span>{page.questionY || 0}</span></div>
+          <input className={styles.sizeRange} aria-label="Soru görseli dikey konumu" type="range" min="-50" max="50" step="1" value={page.questionY || 0} onChange={(e) => setQuestionLayout({ questionY: Number(e.target.value) })} />
           <div className={styles.actionGrid}>
-            <button title="Soruyu çalışma alanına sığdır" onClick={() => setQuestionScale(1)}><ImagePlus size={18} /><span>Sığdır</span></button>
+            <button title="Soruyu çalışma alanına sığdır ve ortala" onClick={() => setQuestionLayout({ questionScale: 1, questionX: 0, questionY: 0 })}><ImagePlus size={18} /><span>Sığdır</span></button>
             <button title="Soruyu büyük göster" onClick={() => setQuestionScale(1.5)}><Plus size={18} /><span>Büyük</span></button>
           </div>
         </section>}
