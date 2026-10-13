@@ -12,6 +12,13 @@ const DEFAULT_BACKGROUNDS = {
   '9:16': '/vision/merkur-vizyon-vertical.jpeg',
   '1:1': '/vision/merkur-vizyon-square.jpeg'
 };
+const DEFAULT_CAMERA_LAYOUTS = {
+  '1:1': { x: 69, y: 5, width: 26, height: 26 },
+  '9:16': { x: 61, y: 8, width: 33, height: 18 },
+  '16:9': { x: 73, y: 6, width: 23, height: 31 },
+  fullscreen: { x: 73, y: 6, width: 23, height: 31 }
+};
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
 const TOOL_GROUPS = [
   { title: 'Sunum', tools: [['laser', 'Lazer (1 sn)', MousePointer2]] },
@@ -112,9 +119,8 @@ function getQuestionImageRect(image, width, height, format, requestedScale = 1.2
   };
   const region = regions[format] || { x: width * .07, y: height * .09, width: width * .86, height: height * .82 };
   const fitScale = Math.min(region.width / image.width, region.height / image.height);
-  const questionScale = Math.min(2.2, Math.max(.5, Number(requestedScale) || 1.25));
-  const maxScale = Math.min(width * .94 / image.width, height * .86 / image.height);
-  const scale = Math.min(fitScale * questionScale, maxScale);
+  const questionScale = Math.min(5, Math.max(.25, Number(requestedScale) || 1.25));
+  const scale = fitScale * questionScale;
   const drawWidth = image.width * scale;
   const drawHeight = image.height * scale;
   const offsetX = Math.min(50, Math.max(-50, Number(positionX) || 0)) / 100 * width * .55;
@@ -122,9 +128,13 @@ function getQuestionImageRect(image, width, height, format, requestedScale = 1.2
   const centerX = region.x + region.width / 2 + offsetX;
   const centerY = region.y + region.height / 2 + offsetY;
   const margin = Math.max(8, Math.min(width, height) * .025);
+  const minX = drawWidth <= width - margin * 2 ? margin : width - drawWidth - margin;
+  const maxX = drawWidth <= width - margin * 2 ? width - drawWidth - margin : margin;
+  const minY = drawHeight <= height - margin * 2 ? margin : height - drawHeight - margin;
+  const maxY = drawHeight <= height - margin * 2 ? height - drawHeight - margin : margin;
   return {
-    x: Math.min(width - drawWidth - margin, Math.max(margin, centerX - drawWidth / 2)),
-    y: Math.min(height - drawHeight - margin, Math.max(margin, centerY - drawHeight / 2)),
+    x: clamp(centerX - drawWidth / 2, minX, maxX),
+    y: clamp(centerY - drawHeight / 2, minY, maxY),
     width: drawWidth,
     height: drawHeight
   };
@@ -170,6 +180,8 @@ function Studio({ onClose, onSaved, initial }) {
   const recordingOutputStreamRef = useRef(null);
   const recordingSessionRef = useRef(0);
   const cropSelectionRef = useRef(null);
+  const questionResizeRef = useRef(null);
+  const cameraTransformRef = useRef(null);
   const currentPageRef = useRef(null);
   const brandBackgroundRef = useRef(null);
   const backgroundImageRef = useRef(null);
@@ -200,6 +212,7 @@ function Studio({ onClose, onSaved, initial }) {
   const [cropMode, setCropMode] = useState(false);
   const [cropSelection, setCropSelection] = useState(null);
   const [backgroundAsset, setBackgroundAsset] = useState(null);
+  const [cameraLayouts, setCameraLayouts] = useState(initialData.cameraLayouts || {});
   const page = pages.find((item) => item.id === pageId) || pages[0];
   const activeSize = tool === 'eraser' ? eraserSize : tool === 'highlighter' ? highlighterSize : tool === 'laser' ? laserSize : penSize;
   const setActiveSize = tool === 'eraser' ? setEraserSize : tool === 'highlighter' ? setHighlighterSize : tool === 'laser' ? setLaserSize : setPenSize;
@@ -443,8 +456,8 @@ function Studio({ onClose, onSaved, initial }) {
         uploadedVideoUrl = result.url;
         setVideoUrl(result.url);
       }
-      const cameraLayout = 'top-right-compact';
-      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages: persistedPages, currentPageId: pageId, cameraLayout } }) });
+      const cameraLayout = 'custom';
+      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages: persistedPages, currentPageId: pageId, cameraLayout, cameraLayouts } }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Kayıt başarısız.');
       toast.success(status === 'PUBLISHED' ? 'İçerik yayımlandı.' : 'Taslak kaydedildi.');
@@ -538,12 +551,11 @@ function Studio({ onClose, onSaved, initial }) {
     drawActionsLayer(ctx, livePage?.actions, canvasRect.width, canvasRect.height, Math.min(2, output.width / canvasRect.width));
     ctx.restore();
     if (video?.readyState >= 2) {
-      const squareCamera = format === '1:1';
-      const portraitCamera = format === '9:16';
-      const x = Math.round(output.width * (squareCamera ? .69 : portraitCamera ? .61 : .73));
-      const y = Math.round(output.height * (squareCamera ? .05 : .08));
-      const width = Math.round(output.width * (squareCamera ? .26 : portraitCamera ? .33 : .23));
-      const height = Math.round(output.height * (squareCamera ? .26 : portraitCamera ? .18 : .31));
+      const layout = cameraLayouts[format] || DEFAULT_CAMERA_LAYOUTS[format] || DEFAULT_CAMERA_LAYOUTS.fullscreen;
+      const x = Math.round(output.width * layout.x / 100);
+      const y = Math.round(output.height * layout.y / 100);
+      const width = Math.round(output.width * layout.width / 100);
+      const height = Math.round(output.height * layout.height / 100);
       const sourceRatio = video.videoWidth / video.videoHeight, targetRatio = width / height;
       let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
       if (sourceRatio > targetRatio) { sw = video.videoHeight * targetRatio; sx = (video.videoWidth - sw) / 2; }
@@ -669,11 +681,67 @@ function Studio({ onClose, onSaved, initial }) {
     link.click();
   };
 
-  const cameraStyle = format === '1:1'
-    ? { right: '5%', top: '5%', width: '26%', height: '26%' }
-    : format === '9:16'
-      ? { right: '6%', top: '8%', width: '33%', height: '18%' }
-      : { right: '4%', top: '6%', width: '23%', height: '31%' };
+  const startQuestionResize = (event, corner) => {
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const image = backgroundImageRef.current;
+    const canvas = canvasRef.current;
+    if (!image || !canvas) return;
+    const rect = getQuestionImageRect(image, canvas.clientWidth, canvas.clientHeight, format, page.questionScale, page.questionX, page.questionY);
+    questionResizeRef.current = { pointerId: event.pointerId, corner, startX: event.clientX, startY: event.clientY, startScale: page.questionScale || 1.25, width: rect.width, height: rect.height };
+  };
+  const resizeQuestion = (event) => {
+    const resize = questionResizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    const horizontal = (resize.corner.includes('right') ? 1 : -1) * (event.clientX - resize.startX) / Math.max(1, resize.width);
+    const vertical = (resize.corner.includes('bottom') ? 1 : -1) * (event.clientY - resize.startY) / Math.max(1, resize.height);
+    setQuestionScale(clamp(resize.startScale * (1 + (horizontal + vertical) / 2), .25, 5));
+  };
+  const finishQuestionResize = (event) => {
+    if (questionResizeRef.current?.pointerId === event.pointerId) questionResizeRef.current = null;
+  };
+
+  const cameraLayout = cameraLayouts[format] || DEFAULT_CAMERA_LAYOUTS[format] || DEFAULT_CAMERA_LAYOUTS.fullscreen;
+  const setCameraLayout = (layout) => setCameraLayouts((old) => ({ ...old, [format]: layout }));
+  const startCameraTransform = (event, mode) => {
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cameraTransformRef.current = { pointerId: event.pointerId, mode, startX: event.clientX, startY: event.clientY, layout: { ...cameraLayout } };
+  };
+  const transformCamera = (event) => {
+    const transform = cameraTransformRef.current;
+    const shell = canvasRef.current?.getBoundingClientRect();
+    if (!transform || transform.pointerId !== event.pointerId || !shell) return;
+    event.stopPropagation();
+    const dx = (event.clientX - transform.startX) / shell.width * 100;
+    const dy = (event.clientY - transform.startY) / shell.height * 100;
+    const next = { ...transform.layout };
+    if (transform.mode === 'move') {
+      next.x = clamp(transform.layout.x + dx, 0, 100 - transform.layout.width);
+      next.y = clamp(transform.layout.y + dy, 0, 100 - transform.layout.height);
+    } else {
+      if (transform.mode.includes('right')) next.width = clamp(transform.layout.width + dx, 14, 100 - transform.layout.x);
+      if (transform.mode.includes('bottom')) next.height = clamp(transform.layout.height + dy, 12, 100 - transform.layout.y);
+      if (transform.mode.includes('left')) {
+        next.x = clamp(transform.layout.x + dx, 0, transform.layout.x + transform.layout.width - 14);
+        next.width = transform.layout.width + transform.layout.x - next.x;
+      }
+      if (transform.mode.includes('top')) {
+        next.y = clamp(transform.layout.y + dy, 0, transform.layout.y + transform.layout.height - 12);
+        next.height = transform.layout.height + transform.layout.y - next.y;
+      }
+    }
+    setCameraLayout(next);
+  };
+  const finishCameraTransform = (event) => {
+    if (cameraTransformRef.current?.pointerId === event.pointerId) cameraTransformRef.current = null;
+  };
+
+  const questionRect = page.background && backgroundAsset?.questionImage && canvasRef.current
+    ? getQuestionImageRect(backgroundAsset.questionImage, canvasRef.current.clientWidth, canvasRef.current.clientHeight, format, page.questionScale, page.questionX, page.questionY)
+    : null;
+  const cameraStyle = { left: `${cameraLayout.x}%`, top: `${cameraLayout.y}%`, width: `${cameraLayout.width}%`, height: `${cameraLayout.height}%` };
 
   return <div className={styles.studio}>
     <div className={styles.studioHeader}>
@@ -729,7 +797,7 @@ function Studio({ onClose, onSaved, initial }) {
             <button title="Görseli ortala" onClick={() => setQuestionLayout({ questionX: 0, questionY: 0 })}><MousePointer2 size={18} /><span>Ortala</span></button>
           </div>
           <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
-          <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="50" max="220" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
+          <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="25" max="500" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
           <div className={styles.rangeLabel}><p>Yatay Konum</p><span>{page.questionX || 0}</span></div>
           <input className={styles.sizeRange} aria-label="Soru görseli yatay konumu" type="range" min="-50" max="50" step="1" value={page.questionX || 0} onChange={(e) => setQuestionLayout({ questionX: Number(e.target.value) })} />
           <div className={styles.rangeLabel}><p>Dikey Konum</p><span>{page.questionY || 0}</span></div>
@@ -747,8 +815,14 @@ function Studio({ onClose, onSaved, initial }) {
       <main className={styles.canvasArea}>
         <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
           <canvas className={cropMode ? styles.cropCursor : tool === 'move-image' ? styles.moveCursor : ''} ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+          {tool === 'move-image' && questionRect && <div className={styles.questionSelection} style={{ left: questionRect.x, top: questionRect.y, width: questionRect.width, height: questionRect.height }}>
+            {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((corner) => <button key={corner} aria-label={`Görseli ${corner} köşesinden boyutlandır`} className={`${styles.resizeHandle} ${styles[corner.replace('-', '')]}`} onPointerDown={(event) => startQuestionResize(event, corner)} onPointerMove={resizeQuestion} onPointerUp={finishQuestionResize} onPointerCancel={finishQuestionResize} />)}
+          </div>}
           {cropMode && cropSelection && <div className={styles.cropSelection} style={{ left: Math.min(cropSelection.start.x, cropSelection.end.x), top: Math.min(cropSelection.start.y, cropSelection.end.y), width: Math.abs(cropSelection.end.x - cropSelection.start.x), height: Math.abs(cropSelection.end.y - cropSelection.start.y) }} />}
-          <video ref={cameraRef} autoPlay muted playsInline style={cameraStyle} className={`${styles.camera} ${cameraOn ? '' : styles.hidden}`} />
+          <div style={cameraStyle} className={`${styles.cameraBox} ${cameraOn ? '' : styles.hidden}`} onPointerDown={(event) => startCameraTransform(event, 'move')} onPointerMove={transformCamera} onPointerUp={finishCameraTransform} onPointerCancel={finishCameraTransform}>
+            <video ref={cameraRef} autoPlay muted playsInline className={styles.camera} />
+            {['top', 'right', 'bottom', 'left', 'top-left', 'top-right', 'bottom-left', 'bottom-right'].map((edge) => <button key={edge} aria-label={`Kamerayı ${edge} yönünden boyutlandır`} className={`${styles.cameraHandle} ${styles[`camera${edge.replace('-', '')}`]}`} onPointerDown={(event) => startCameraTransform(event, `resize-${edge}`)} onPointerMove={transformCamera} onPointerUp={finishCameraTransform} onPointerCancel={finishCameraTransform} />)}
+          </div>
         </div>
       </main>
       <aside className={styles.pages}>
