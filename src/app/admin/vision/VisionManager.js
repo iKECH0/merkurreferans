@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Circle, Crop, Download, Eraser, FileText, Highlighter, ImagePlus, Minus, MousePointer2, Pen, Play, Plus, RectangleHorizontal, RotateCcw, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
+import { ArrowLeft, Circle, Crop, Download, Eraser, FileText, Highlighter, ImagePlus, Minus, MousePointer2, Move, Pen, Play, Plus, RectangleHorizontal, RotateCcw, Save, Trash2, Undo2, Video, VideoOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { upload as uploadBlob } from '@vercel/blob/client';
 import styles from './vision.module.css';
@@ -303,6 +303,16 @@ function Studio({ onClose, onSaved, initial }) {
       setCropSelection(selection);
       return;
     }
+    if (tool === 'move-image') {
+      if (!page.background) return toast.error('Taşımak için önce bir görsel veya PDF ekleyin.');
+      activeRef.current = {
+        tool: 'move-image',
+        startPoint: point(event),
+        startX: page.questionX || 0,
+        startY: page.questionY || 0
+      };
+      return;
+    }
     activeRef.current = { id: crypto.randomUUID(), tool, color: tool === 'laser' ? '#ef4444' : color, size: activeSize, opacity: ['eraser', 'laser'].includes(tool) ? 1 : strokeOpacity / 100, pressureEnabled, penStyle, eraserDiameter: tool === 'eraser', points: [point(event)], startTime: Date.now() - startedAt.current };
   };
   const move = (event) => {
@@ -313,6 +323,14 @@ function Studio({ onClose, onSaved, initial }) {
       return;
     }
     if (!activeRef.current) return;
+    if (activeRef.current.tool === 'move-image') {
+      const current = point(event);
+      const rect = canvasRef.current.getBoundingClientRect();
+      const questionX = Math.min(50, Math.max(-50, activeRef.current.startX + ((current.x - activeRef.current.startPoint.x) / (rect.width * .55)) * 100));
+      const questionY = Math.min(50, Math.max(-50, activeRef.current.startY + ((current.y - activeRef.current.startPoint.y) / (rect.height * .55)) * 100));
+      setPages((old) => old.map((item) => item.id === page.id ? { ...item, questionX: Math.round(questionX), questionY: Math.round(questionY) } : item));
+      return;
+    }
     const events = event.getCoalescedEvents?.() || [event];
     events.forEach((pointerEvent) => {
       const nextPoint = point(pointerEvent);
@@ -374,6 +392,10 @@ function Studio({ onClose, onSaved, initial }) {
       return;
     }
     if (!activeRef.current) return;
+    if (activeRef.current.tool === 'move-image') {
+      activeRef.current = null;
+      return;
+    }
     const action = { ...activeRef.current, endTime: Date.now() - startedAt.current, ...(activeRef.current.tool === 'laser' ? { expiresAt: Date.now() + 1000 } : {}) };
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), action] } : item));
     if (action.tool === 'laser') {
@@ -675,11 +697,11 @@ function Studio({ onClose, onSaved, initial }) {
           <p>{group.title}</p>
           <div className={styles.toolGrid}>{group.tools.map(([name, label, Icon]) => <button key={name} title={label} className={tool === name ? styles.activeTool : ''} onClick={() => setTool(name)}><Icon size={19} /><span>{label}</span></button>)}</div>
         </section>)}
-        <section className={styles.toolSection}>
+        {tool !== 'move-image' && <section className={styles.toolSection}>
           <p>Renk</p>
           <div className={styles.colorGrid}>{COLORS.map((item) => <button key={item} aria-label={item} className={`${styles.color} ${color === item ? styles.activeColor : ''}`} style={{ background: item }} onClick={() => setColor(item)} />)}</div>
-        </section>
-        <section className={styles.toolSection}>
+        </section>}
+        {tool !== 'move-image' && <section className={styles.toolSection}>
           <div className={styles.rangeLabel}><p>{tool === 'eraser' ? 'Silgi Boyutu' : tool === 'highlighter' ? 'Fosforlu Kalınlığı' : tool === 'laser' ? 'Lazer Kalınlığı' : 'Kalem Hassasiyeti'}</p><span>{activeSize}px</span></div>
           <input className={styles.sizeRange} aria-label={tool === 'eraser' ? 'Silgi boyutu' : 'Çizgi kalınlığı'} type="range" min={tool === 'eraser' ? 8 : 1} max={tool === 'eraser' ? 80 : tool === 'highlighter' ? 24 : 12} step={tool === 'pen' ? .5 : 1} value={activeSize} onChange={(e) => setActiveSize(Number(e.target.value))} />
           <div className={styles.strokePreview}><span className={tool === 'eraser' ? styles.eraserPreview : ''} style={{ width: Math.min(64, activeSize * 2), height: tool === 'eraser' ? Math.min(22, Math.max(8, activeSize / 3)) : Math.max(2, activeSize / 2), background: tool === 'eraser' ? '#fff' : color }} /></div>
@@ -688,7 +710,7 @@ function Studio({ onClose, onSaved, initial }) {
           </div>
           {tool === 'pen' && <div className={styles.sensitivityNote}><span className={styles.statusDot} /> Yüksek hassasiyet açık · Basınç {pressureEnabled ? 'açık' : 'kapalı'}</div>}
           {tool === 'laser' && <div className={styles.laserNote}><span className={styles.laserDot} /> Çizgi 1 saniye içinde yumuşakça kaybolur</div>}
-        </section>
+        </section>}
         {tool === 'pen' && <section className={styles.toolSection}>
           <p>Kalem Karakteri</p>
           <div className={styles.segmentedControl}>
@@ -696,11 +718,16 @@ function Studio({ onClose, onSaved, initial }) {
           </div>
           <label className={styles.switchRow}><span><strong>Basınç Duyarlılığı</strong><small>Tablet kalemine göre kalınlaşır</small></span><input type="checkbox" checked={pressureEnabled} onChange={(e) => setPressureEnabled(e.target.checked)} /><i /></label>
         </section>}
-        {!['eraser', 'laser'].includes(tool) && <section className={styles.toolSection}>
+        {!['eraser', 'laser', 'move-image'].includes(tool) && <section className={styles.toolSection}>
           <div className={styles.rangeLabel}><p>Opaklık</p><span>%{strokeOpacity}</span></div>
           <input className={styles.sizeRange} aria-label="Çizgi opaklığı" type="range" min="20" max="100" step="5" value={strokeOpacity} onChange={(e) => setStrokeOpacity(Number(e.target.value))} />
         </section>}
         {page.background && <section className={styles.toolSection}>
+          <p>Görsel Yerleşimi</p>
+          <div className={styles.actionGrid}>
+            <button className={tool === 'move-image' ? styles.activeTool : ''} title="Görseli tahta üzerinde sürükleyin" onClick={() => setTool('move-image')}><Move size={18} /><span>Görseli Taşı</span></button>
+            <button title="Görseli ortala" onClick={() => setQuestionLayout({ questionX: 0, questionY: 0 })}><MousePointer2 size={18} /><span>Ortala</span></button>
+          </div>
           <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
           <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="50" max="220" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
           <div className={styles.rangeLabel}><p>Yatay Konum</p><span>{page.questionX || 0}</span></div>
@@ -719,7 +746,7 @@ function Studio({ onClose, onSaved, initial }) {
       </aside>
       <main className={styles.canvasArea}>
         <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
-          <canvas className={cropMode ? styles.cropCursor : ''} ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+          <canvas className={cropMode ? styles.cropCursor : tool === 'move-image' ? styles.moveCursor : ''} ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
           {cropMode && cropSelection && <div className={styles.cropSelection} style={{ left: Math.min(cropSelection.start.x, cropSelection.end.x), top: Math.min(cropSelection.start.y, cropSelection.end.y), width: Math.abs(cropSelection.end.x - cropSelection.start.x), height: Math.abs(cropSelection.end.y - cropSelection.start.y) }} />}
           <video ref={cameraRef} autoPlay muted playsInline style={cameraStyle} className={`${styles.camera} ${cameraOn ? '' : styles.hidden}`} />
         </div>
