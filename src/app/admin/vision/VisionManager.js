@@ -177,10 +177,12 @@ function Studio({ onClose, onSaved, initial }) {
   const activeRef = useRef(null);
   const recorderRef = useRef(null);
   const recordingFrameRef = useRef(null);
+  const drawingFrameRef = useRef(null);
   const recordingOutputStreamRef = useRef(null);
   const recordingSessionRef = useRef(0);
   const cropSelectionRef = useRef(null);
   const questionResizeRef = useRef(null);
+  const questionMoveRef = useRef(null);
   const cameraTransformRef = useRef(null);
   const currentPageRef = useRef(null);
   const brandBackgroundRef = useRef(null);
@@ -275,7 +277,9 @@ function Studio({ onClose, onSaved, initial }) {
     if (backgroundAsset?.questionSource === questionSource && backgroundAsset.questionImage?.complete) {
       drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale, page.questionX, page.questionY);
     }
-    drawActionsLayer(ctx, page.actions, rect.width, rect.height, ratio);
+    const liveAction = activeRef.current?.points ? activeRef.current : null;
+    const visibleActions = liveAction && !page.actions.some((action) => action.id === liveAction.id) ? [...page.actions, liveAction] : page.actions;
+    drawActionsLayer(ctx, visibleActions, rect.width, rect.height, ratio);
   }, [page, format, backgroundAsset, laserTick]);
 
   useEffect(() => { render(); }, [render]);
@@ -295,6 +299,7 @@ function Studio({ onClose, onSaved, initial }) {
     recordingOutputStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
     streamRef.current?.getTracks().forEach((track) => track.stop());
     if (recordingFrameRef.current) cancelAnimationFrame(recordingFrameRef.current);
+    if (drawingFrameRef.current) cancelAnimationFrame(drawingFrameRef.current);
   }, []);
 
   const point = (event) => {
@@ -351,8 +356,12 @@ function Studio({ onClose, onSaved, initial }) {
       const distance = Math.hypot(nextPoint.x - previousPoint.x, nextPoint.y - previousPoint.y);
       if (distance >= 0.12) activeRef.current.points.push(nextPoint);
     });
-    const action = activeRef.current;
-    setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), { ...action }] } : item));
+    if (!drawingFrameRef.current) {
+      drawingFrameRef.current = requestAnimationFrame(() => {
+        drawingFrameRef.current = null;
+        render();
+      });
+    }
   };
   const applyCrop = (selection) => {
     const canvas = canvasRef.current;
@@ -409,7 +418,11 @@ function Studio({ onClose, onSaved, initial }) {
       activeRef.current = null;
       return;
     }
-    const action = { ...activeRef.current, endTime: Date.now() - startedAt.current, ...(activeRef.current.tool === 'laser' ? { expiresAt: Date.now() + 1000 } : {}) };
+    if (drawingFrameRef.current) {
+      cancelAnimationFrame(drawingFrameRef.current);
+      drawingFrameRef.current = null;
+    }
+    const action = { ...activeRef.current, points: [...activeRef.current.points], endTime: Date.now() - startedAt.current, ...(activeRef.current.tool === 'laser' ? { expiresAt: Date.now() + 1000 } : {}) };
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, actions: [...item.actions.filter((a) => a.id !== action.id), action] } : item));
     if (action.tool === 'laser') {
       window.setTimeout(() => setPages((old) => old.map((item) => ({ ...item, actions: item.actions.filter((candidate) => candidate.id !== action.id) }))), 1050);
@@ -472,7 +485,10 @@ function Studio({ onClose, onSaved, initial }) {
     if (file.size > 15 * 1024 * 1024) return toast.error('Dosya en fazla 15 MB olabilir.');
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = () => setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result, backgroundHistory: [], questionScale: 1.25 } : item));
+      reader.onload = () => {
+        setPages((old) => old.map((item) => item.id === page.id ? { ...item, background: reader.result, backgroundHistory: [], questionScale: 1.25, questionX: 0, questionY: 0 } : item));
+        setTool('move-image');
+      };
       reader.readAsDataURL(file);
       return;
     }
@@ -509,6 +525,7 @@ function Studio({ onClose, onSaved, initial }) {
       }
       setPages((old) => [...old, ...importedPages]);
       setPageId(importedPages[0].id);
+      setTool('move-image');
       toast.success(`${importedPages.length} PDF sayfası tahtaya eklendi.`);
     } catch (error) {
       console.error('PDF import failed:', error);
@@ -548,7 +565,9 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
     if (brandImage?.complete) drawBackground(ctx, brandImage, canvasRect.width, canvasRect.height);
     if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format, livePage?.questionScale, livePage?.questionX, livePage?.questionY);
-    drawActionsLayer(ctx, livePage?.actions, canvasRect.width, canvasRect.height, Math.min(2, output.width / canvasRect.width));
+    const recordingAction = activeRef.current?.points ? activeRef.current : null;
+    const recordingActions = recordingAction ? [...(livePage?.actions || []).filter((action) => action.id !== recordingAction.id), recordingAction] : livePage?.actions;
+    drawActionsLayer(ctx, recordingActions, canvasRect.width, canvasRect.height, Math.min(2, output.width / canvasRect.width));
     ctx.restore();
     if (video?.readyState >= 2) {
       const layout = cameraLayouts[format] || DEFAULT_CAMERA_LAYOUTS[format] || DEFAULT_CAMERA_LAYOUTS.fullscreen;
@@ -701,6 +720,25 @@ function Studio({ onClose, onSaved, initial }) {
   const finishQuestionResize = (event) => {
     if (questionResizeRef.current?.pointerId === event.pointerId) questionResizeRef.current = null;
   };
+  const startQuestionMove = (event) => {
+    if (event.target !== event.currentTarget) return;
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    questionMoveRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, questionX: page.questionX || 0, questionY: page.questionY || 0 };
+  };
+  const moveQuestion = (event) => {
+    const movement = questionMoveRef.current;
+    const canvas = canvasRef.current?.getBoundingClientRect();
+    if (!movement || movement.pointerId !== event.pointerId || !canvas) return;
+    event.stopPropagation();
+    setQuestionLayout({
+      questionX: Math.round(clamp(movement.questionX + (event.clientX - movement.startX) / (canvas.width * .55) * 100, -50, 50)),
+      questionY: Math.round(clamp(movement.questionY + (event.clientY - movement.startY) / (canvas.height * .55) * 100, -50, 50))
+    });
+  };
+  const finishQuestionMove = (event) => {
+    if (questionMoveRef.current?.pointerId === event.pointerId) questionMoveRef.current = null;
+  };
 
   const cameraLayout = cameraLayouts[format] || DEFAULT_CAMERA_LAYOUTS[format] || DEFAULT_CAMERA_LAYOUTS.fullscreen;
   const setCameraLayout = (layout) => setCameraLayouts((old) => ({ ...old, [format]: layout }));
@@ -796,12 +834,9 @@ function Studio({ onClose, onSaved, initial }) {
             <button className={tool === 'move-image' ? styles.activeTool : ''} title="Görseli tahta üzerinde sürükleyin" onClick={() => setTool('move-image')}><Move size={18} /><span>Görseli Taşı</span></button>
             <button title="Görseli ortala" onClick={() => setQuestionLayout({ questionX: 0, questionY: 0 })}><MousePointer2 size={18} /><span>Ortala</span></button>
           </div>
+          <div className={styles.imageMoveNote}><Move size={14} /> Görseli kutusundan tutup taşıyın; mavi köşelerden çekip boyutlandırın.</div>
           <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
           <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="25" max="500" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
-          <div className={styles.rangeLabel}><p>Yatay Konum</p><span>{page.questionX || 0}</span></div>
-          <input className={styles.sizeRange} aria-label="Soru görseli yatay konumu" type="range" min="-50" max="50" step="1" value={page.questionX || 0} onChange={(e) => setQuestionLayout({ questionX: Number(e.target.value) })} />
-          <div className={styles.rangeLabel}><p>Dikey Konum</p><span>{page.questionY || 0}</span></div>
-          <input className={styles.sizeRange} aria-label="Soru görseli dikey konumu" type="range" min="-50" max="50" step="1" value={page.questionY || 0} onChange={(e) => setQuestionLayout({ questionY: Number(e.target.value) })} />
           <div className={styles.actionGrid}>
             <button title="Soruyu çalışma alanına sığdır ve ortala" onClick={() => setQuestionLayout({ questionScale: 1, questionX: 0, questionY: 0 })}><ImagePlus size={18} /><span>Sığdır</span></button>
             <button title="Soruyu büyük göster" onClick={() => setQuestionScale(1.5)}><Plus size={18} /><span>Büyük</span></button>
@@ -815,7 +850,7 @@ function Studio({ onClose, onSaved, initial }) {
       <main className={styles.canvasArea}>
         <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
           <canvas className={cropMode ? styles.cropCursor : tool === 'move-image' ? styles.moveCursor : ''} ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
-          {tool === 'move-image' && questionRect && <div className={styles.questionSelection} style={{ left: questionRect.x, top: questionRect.y, width: questionRect.width, height: questionRect.height }}>
+          {tool === 'move-image' && questionRect && <div className={styles.questionSelection} style={{ left: questionRect.x, top: questionRect.y, width: questionRect.width, height: questionRect.height }} onPointerDown={startQuestionMove} onPointerMove={moveQuestion} onPointerUp={finishQuestionMove} onPointerCancel={finishQuestionMove}>
             {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((corner) => <button key={corner} aria-label={`Görseli ${corner} köşesinden boyutlandır`} className={`${styles.resizeHandle} ${styles[corner.replace('-', '')]}`} onPointerDown={(event) => startQuestionResize(event, corner)} onPointerMove={resizeQuestion} onPointerUp={finishQuestionResize} onPointerCancel={finishQuestionResize} />)}
           </div>}
           {cropMode && cropSelection && <div className={styles.cropSelection} style={{ left: Math.min(cropSelection.start.x, cropSelection.end.x), top: Math.min(cropSelection.start.y, cropSelection.end.y), width: Math.abs(cropSelection.end.x - cropSelection.start.x), height: Math.abs(cropSelection.end.y - cropSelection.start.y) }} />}

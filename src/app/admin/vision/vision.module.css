@@ -70,6 +70,7 @@
 .statusDot { flex:0 0 auto; width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.14); }
 .laserNote { display:flex; align-items:center; gap:7px; margin-top:8px; padding:8px; border:1px solid #fecaca; border-radius:9px; color:#991b1b; background:#fff1f2; font-size:.59rem; font-weight:800; line-height:1.3; }
 .laserDot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:#ef4444; box-shadow:0 0 0 4px rgba(239,68,68,.14),0 0 9px #ef4444; }
+.imageMoveNote { display:flex; align-items:center; gap:6px; margin:8px 0; padding:8px; border:1px solid #bfdbfe; border-radius:9px; color:#1e40af; background:#eff6ff; font-size:.59rem; font-weight:800; line-height:1.3; }
 .segmentedControl { display:grid; grid-template-columns:repeat(3,1fr); padding:3px; border-radius:10px; background:#e2e8f0; }
 .segmentedControl button { padding:7px 2px; border:0; border-radius:8px; color:#64748b; background:transparent; cursor:pointer; font-size:.59rem; font-weight:900; transition:all .15s ease; }
 .segmentedControl .segmentActive { color:#1e40af; background:#fff; box-shadow:0 2px 7px rgba(15,23,42,.12); }
@@ -93,7 +94,7 @@
 .canvasShell canvas.cropCursor { cursor:crosshair; }
 .canvasShell canvas.moveCursor { cursor:grab; }
 .canvasShell canvas.moveCursor:active { cursor:grabbing; }
-.questionSelection { position:absolute; z-index:3; pointer-events:none; border:2px solid #3b82f6; box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 0 9999px rgba(37,99,235,.035); }
+.questionSelection { position:absolute; z-index:3; border:2px solid #3b82f6; box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 0 9999px rgba(37,99,235,.035); cursor:move; touch-action:none; }
 .resizeHandle { position:absolute; width:18px; height:18px; padding:0; border:3px solid #fff; border-radius:5px; background:#2563eb; box-shadow:0 2px 8px rgba(15,23,42,.35); pointer-events:auto; touch-action:none; }
 .resizeHandle.topleft { left:-10px; top:-10px; cursor:nwse-resize; }
 .resizeHandle.topright { right:-10px; top:-10px; cursor:nesw-resize; }
