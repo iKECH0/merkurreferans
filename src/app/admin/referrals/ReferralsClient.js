@@ -424,7 +424,7 @@ export default function ReferralsClient({ initialReferrers, initialWallets, init
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-            {ALL_LEVELS_INFO.map((lvl) => (
+            {[...ALL_LEVELS_INFO].reverse().map((lvl) => (
               <div key={lvl.role} style={{
                 background: 'rgba(15, 23, 42, 0.65)',
                 border: `1px solid ${lvl.color}35`,
