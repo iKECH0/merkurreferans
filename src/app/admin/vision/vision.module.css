@@ -42,6 +42,13 @@
 .toolbarBrand strong { display:block; font-size:.84rem; }
 .toolbarBrand span { display:block; color:#64748b; font-size:.68rem; margin-top:2px; }
 .toolbarBrand .proBadge { margin-left:auto; padding:3px 6px; border-radius:999px; color:#fff; background:linear-gradient(135deg,#2563eb,#4f46e5); font-size:.55rem; font-weight:900; letter-spacing:.06em; box-shadow:0 3px 8px rgba(37,99,235,.22); }
+.cameraBackgroundGrid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.cameraBackgroundGrid button { position:relative; aspect-ratio:1.35; overflow:hidden; padding:0; border:2px solid #dbe3ef; border-radius:9px; color:#475569; background:#f1f5f9 center/cover no-repeat; cursor:pointer; }
+.cameraBackgroundGrid button span { position:absolute; inset:auto 2px 2px; padding:2px; border-radius:4px; color:#fff; background:rgba(15,23,42,.72); font-size:.52rem; font-weight:900; }
+.cameraBackgroundGrid .activeCameraBackground,.cameraBackgroundUpload.activeCameraBackground { border-color:#2563eb; box-shadow:0 0 0 2px #bfdbfe; }
+.cameraBackgroundUpload { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:7px; padding:8px; border:1px dashed #93c5fd; border-radius:9px; color:#1d4ed8; background:#eff6ff; cursor:pointer; font-size:.62rem; font-weight:900; }
+.cameraBackgroundStatus { display:flex; align-items:center; gap:6px; margin-top:7px; color:#475569; font-size:.58rem; font-weight:800; }
+.cameraBackgroundStatus span { width:7px; height:7px; border-radius:50%; background:#2563eb; animation:pulse 1s infinite; }
 .toolSection { padding:12px 2px; border-top:1px solid #e5eaf1; }
 .toolSection > p,.rangeLabel p { margin:0 0 8px; color:#64748b; font-size:.66rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
 .toolGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
@@ -110,6 +117,7 @@
 .formatfullscreen { width:100%; height:100%; }
 .cameraBox { position:absolute; z-index:5; min-width:80px; min-height:64px; border:4px solid white; border-radius:18px; box-shadow:0 10px 35px rgba(0,0,0,.35); cursor:move; touch-action:none; }
 .camera { display:block; width:100%; height:100%; object-fit:cover; object-position:center center; border-radius:13px; pointer-events:none; }
+.cameraComposite { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:13px; pointer-events:none; }
 .format11 .cameraBox { border-radius:20px; }
 .format11 .camera { border-radius:15px; }
 .cameraHandle { position:absolute; z-index:2; margin:0; padding:0; border:2px solid #fff; background:#2563eb; touch-action:none; }

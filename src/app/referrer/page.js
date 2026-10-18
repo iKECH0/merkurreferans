@@ -44,8 +44,9 @@ export default async function ReferrerDashboard() {
 
   // Kariyer Kademe Hesaplama
   const levelInfo = getUserLevel(user?.role || session.user.role, totalStudents);
-  const teacherTiers = ALL_LEVELS_INFO.filter(l => l.role !== 'STUDENT');
-  const nextTier = teacherTiers.find(t => t.minReferrals > totalStudents) || null;
+  const progressionTiers = ALL_LEVELS_INFO.filter(l => l.role !== 'STUDENT');
+  const teacherTiers = [...progressionTiers].reverse();
+  const nextTier = progressionTiers.find(t => t.minReferrals > totalStudents) || null;
   const remainingToNext = nextTier ? nextTier.minReferrals - totalStudents : 0;
   const progressPercent = nextTier ? Math.min(100, Math.round((totalStudents / nextTier.minReferrals) * 100)) : 100;
 

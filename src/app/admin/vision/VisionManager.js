@@ -18,6 +18,11 @@ const DEFAULT_CAMERA_LAYOUTS = {
   '16:9': { x: 73, y: 6, width: 23, height: 31 },
   fullscreen: { x: 73, y: 6, width: 23, height: 31 }
 };
+const CAMERA_BACKGROUNDS = [
+  { id: 'none', label: 'Fonsuz', source: null },
+  { id: 'background-1', label: 'Fon 1', source: '/vision/camera-backgrounds/1.jpeg' },
+  { id: 'background-2', label: 'Fon 2', source: '/vision/camera-backgrounds/2.jpeg' }
+];
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
 const TOOL_GROUPS = [
@@ -173,6 +178,10 @@ function drawActionsLayer(ctx, actions, width, height, pixelRatio = 1) {
 function Studio({ onClose, onSaved, initial }) {
   const canvasRef = useRef(null);
   const cameraRef = useRef(null);
+  const cameraCompositeRef = useRef(null);
+  const cameraCompositeReadyRef = useRef(false);
+  const cameraSegmentationRef = useRef(null);
+  const cameraSegmentationFrameRef = useRef(null);
   const streamRef = useRef(null);
   const activeRef = useRef(null);
   const recorderRef = useRef(null);
@@ -205,6 +214,9 @@ function Studio({ onClose, onSaved, initial }) {
   const [laserTick, setLaserTick] = useState(0);
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [cameraBackground, setCameraBackground] = useState(initialData.cameraBackground || 'none');
+  const [cameraBackgroundSource, setCameraBackgroundSource] = useState(() => CAMERA_BACKGROUNDS.find((item) => item.id === initialData.cameraBackground)?.source || null);
+  const [cameraBackgroundBusy, setCameraBackgroundBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState(null);
@@ -257,6 +269,80 @@ function Studio({ onClose, onSaved, initial }) {
     });
     return () => { cancelled = true; };
   }, [page?.background, format]);
+
+  useEffect(() => {
+    if (!cameraOn || !cameraBackgroundSource) {
+      cameraCompositeReadyRef.current = false;
+      setCameraBackgroundBusy(false);
+      if (cameraSegmentationFrameRef.current) cancelAnimationFrame(cameraSegmentationFrameRef.current);
+      cameraSegmentationFrameRef.current = null;
+      cameraSegmentationRef.current?.close?.();
+      cameraSegmentationRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    let processing = false;
+    cameraCompositeReadyRef.current = false;
+    setCameraBackgroundBusy(true);
+    const backgroundImage = new Image();
+    backgroundImage.src = cameraBackgroundSource;
+    const run = async () => {
+      try {
+        await backgroundImage.decode();
+        const { SelfieSegmentation } = await import('@mediapipe/selfie_segmentation');
+        if (cancelled) return;
+        const segmenter = new SelfieSegmentation({ locateFile: (file) => `/mediapipe/selfie_segmentation/${file}` });
+        segmenter.setOptions({ modelSelection: 1, selfieMode: true });
+        segmenter.onResults((results) => {
+          if (cancelled) return;
+          const output = cameraCompositeRef.current;
+          const video = cameraRef.current;
+          if (!output || !video?.videoWidth || !results.segmentationMask) return;
+          output.width = video.videoWidth;
+          output.height = video.videoHeight;
+          const context = output.getContext('2d');
+          context.clearRect(0, 0, output.width, output.height);
+          context.save();
+          context.drawImage(results.segmentationMask, 0, 0, output.width, output.height);
+          context.globalCompositeOperation = 'source-in';
+          context.drawImage(results.image, 0, 0, output.width, output.height);
+          context.globalCompositeOperation = 'destination-over';
+          const scale = Math.max(output.width / backgroundImage.width, output.height / backgroundImage.height);
+          const backgroundWidth = backgroundImage.width * scale;
+          const backgroundHeight = backgroundImage.height * scale;
+          context.drawImage(backgroundImage, (output.width - backgroundWidth) / 2, (output.height - backgroundHeight) / 2, backgroundWidth, backgroundHeight);
+          context.restore();
+          cameraCompositeReadyRef.current = true;
+          setCameraBackgroundBusy(false);
+        });
+        cameraSegmentationRef.current = segmenter;
+        const processFrame = async () => {
+          if (cancelled) return;
+          const video = cameraRef.current;
+          if (!processing && video?.readyState >= 2) {
+            processing = true;
+            try { await segmenter.send({ image: video }); } catch (error) { console.error('Camera background processing failed:', error); }
+            processing = false;
+          }
+          cameraSegmentationFrameRef.current = requestAnimationFrame(processFrame);
+        };
+        processFrame();
+      } catch (error) {
+        console.error('Virtual camera background failed:', error);
+        setCameraBackgroundBusy(false);
+        toast.error('Sanal kamera fonu başlatılamadı. Fonsuz kamera kullanılacak.');
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+      cameraCompositeReadyRef.current = false;
+      if (cameraSegmentationFrameRef.current) cancelAnimationFrame(cameraSegmentationFrameRef.current);
+      cameraSegmentationFrameRef.current = null;
+      cameraSegmentationRef.current?.close?.();
+      cameraSegmentationRef.current = null;
+    };
+  }, [cameraOn, cameraBackgroundSource]);
 
   const render = useCallback(() => {
     void laserTick;
@@ -470,7 +556,8 @@ function Studio({ onClose, onSaved, initial }) {
         setVideoUrl(result.url);
       }
       const cameraLayout = 'custom';
-      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages: persistedPages, currentPageId: pageId, cameraLayout, cameraLayouts } }) });
+      const savedCameraBackground = CAMERA_BACKGROUNDS.some((item) => item.id === cameraBackground) ? cameraBackground : 'none';
+      const response = await fetch(initial?.id ? `/api/vision/${initial.id}` : '/api/vision', { method: initial?.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, format, durationMs, status, videoUrl: uploadedVideoUrl, data: { version: 2, pages: persistedPages, currentPageId: pageId, cameraLayout, cameraLayouts, cameraBackground: savedCameraBackground } }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Kayıt başarısız.');
       toast.success(status === 'PUBLISHED' ? 'İçerik yayımlandı.' : 'Taslak kaydedildi.');
@@ -550,6 +637,25 @@ function Studio({ onClose, onSaved, initial }) {
     } catch { toast.error('Kamera açılamadı. Tarayıcı iznini kontrol edin.'); }
   };
 
+  const selectCameraBackground = (item) => {
+    setCameraBackground(item.id);
+    setCameraBackgroundSource(item.source);
+  };
+  const uploadCameraBackground = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return toast.error('Lütfen bir görsel dosyası seçin.');
+    if (file.size > 8 * 1024 * 1024) return toast.error('Kamera fonu en fazla 8 MB olabilir.');
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCameraBackground('custom');
+      setCameraBackgroundSource(reader.result);
+      toast.success('Özel kamera fonu hazırlandı.');
+    };
+    reader.readAsDataURL(file);
+  };
+
   const drawCompositeFrame = (output, sourceCanvas, video) => {
     const ctx = output.getContext('2d');
     ctx.imageSmoothingEnabled = true;
@@ -575,13 +681,17 @@ function Studio({ onClose, onSaved, initial }) {
       const y = Math.round(output.height * layout.y / 100);
       const width = Math.round(output.width * layout.width / 100);
       const height = Math.round(output.height * layout.height / 100);
-      const sourceRatio = video.videoWidth / video.videoHeight, targetRatio = width / height;
-      let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
-      if (sourceRatio > targetRatio) { sw = video.videoHeight * targetRatio; sx = (video.videoWidth - sw) / 2; }
-      else { sh = video.videoWidth / targetRatio; sy = (video.videoHeight - sh) / 2; }
+      const processedCamera = cameraBackgroundSource && cameraCompositeReadyRef.current ? cameraCompositeRef.current : null;
+      const cameraSource = processedCamera || video;
+      const sourceWidth = processedCamera?.width || video.videoWidth;
+      const sourceHeight = processedCamera?.height || video.videoHeight;
+      const sourceRatio = sourceWidth / sourceHeight, targetRatio = width / height;
+      let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
+      if (sourceRatio > targetRatio) { sw = sourceHeight * targetRatio; sx = (sourceWidth - sw) / 2; }
+      else { sh = sourceWidth / targetRatio; sy = (sourceHeight - sh) / 2; }
       ctx.save();
       ctx.beginPath(); ctx.roundRect(x, y, width, height, Math.max(16, output.width * .018)); ctx.clip();
-      ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
+      ctx.drawImage(cameraSource, sx, sy, sw, sh, x, y, width, height);
       ctx.restore();
       ctx.save();
       ctx.strokeStyle = '#fff';
@@ -799,6 +909,14 @@ function Studio({ onClose, onSaved, initial }) {
     <div className={styles.workspace}>
       <aside className={styles.toolbar}>
         <div className={styles.toolbarBrand}><div className={styles.toolbarBrandIcon}><Pen size={18} /></div><div><strong>Akıllı Kalem Paneli</strong><span>Hassas çizim araçları</span></div><span className={styles.proBadge}>PRO</span></div>
+        <section className={styles.toolSection}>
+          <p>Kamera Fonu</p>
+          <div className={styles.cameraBackgroundGrid}>
+            {CAMERA_BACKGROUNDS.map((item) => <button key={item.id} className={cameraBackground === item.id ? styles.activeCameraBackground : ''} onClick={() => selectCameraBackground(item)} title={item.label} style={item.source ? { backgroundImage: `url(${item.source})` } : undefined}><span>{item.label}</span></button>)}
+          </div>
+          <label className={`${styles.cameraBackgroundUpload} ${cameraBackground === 'custom' ? styles.activeCameraBackground : ''}`}><ImagePlus size={16} /><span>{cameraBackground === 'custom' ? 'Özel Fon Seçili' : 'Özel Fon Yükle'}</span><input hidden type="file" accept="image/*" onChange={uploadCameraBackground} /></label>
+          {cameraBackgroundBusy && <div className={styles.cameraBackgroundStatus}><span /> Kişi fondan ayrılıyor…</div>}
+        </section>
         {TOOL_GROUPS.map((group) => <section className={styles.toolSection} key={group.title}>
           <p>{group.title}</p>
           <div className={styles.toolGrid}>{group.tools.map(([name, label, Icon]) => <button key={name} title={label} className={tool === name ? styles.activeTool : ''} onClick={() => setTool(name)}><Icon size={19} /><span>{label}</span></button>)}</div>
@@ -856,6 +974,7 @@ function Studio({ onClose, onSaved, initial }) {
           {cropMode && cropSelection && <div className={styles.cropSelection} style={{ left: Math.min(cropSelection.start.x, cropSelection.end.x), top: Math.min(cropSelection.start.y, cropSelection.end.y), width: Math.abs(cropSelection.end.x - cropSelection.start.x), height: Math.abs(cropSelection.end.y - cropSelection.start.y) }} />}
           <div style={cameraStyle} className={`${styles.cameraBox} ${cameraOn ? '' : styles.hidden}`} onPointerDown={(event) => startCameraTransform(event, 'move')} onPointerMove={transformCamera} onPointerUp={finishCameraTransform} onPointerCancel={finishCameraTransform}>
             <video ref={cameraRef} autoPlay muted playsInline className={styles.camera} />
+            <canvas ref={cameraCompositeRef} className={`${styles.cameraComposite} ${cameraBackgroundSource && !cameraBackgroundBusy ? '' : styles.hidden}`} />
             {['top', 'right', 'bottom', 'left', 'top-left', 'top-right', 'bottom-left', 'bottom-right'].map((edge) => <button key={edge} aria-label={`Kamerayı ${edge} yönünden boyutlandır`} className={`${styles.cameraHandle} ${styles[`camera${edge.replace('-', '')}`]}`} onPointerDown={(event) => startCameraTransform(event, `resize-${edge}`)} onPointerMove={transformCamera} onPointerUp={finishCameraTransform} onPointerCancel={finishCameraTransform} />)}
           </div>
         </div>
