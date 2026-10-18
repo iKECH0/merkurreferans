@@ -303,7 +303,9 @@ function Studio({ onClose, onSaved, initial }) {
           if (!output || !video?.videoWidth || !results.segmentationMask) return;
           output.width = video.videoWidth;
           output.height = video.videoHeight;
-          const maskWidth = Math.min(384, video.videoWidth);
+          // Work at a higher mask resolution so the cutout follows hair and
+          // shoulders closely instead of producing a wide, soft halo.
+          const maskWidth = Math.min(512, video.videoWidth);
           const maskHeight = Math.max(1, Math.round(maskWidth * video.videoHeight / video.videoWidth));
           if (refinedMask.width !== maskWidth || refinedMask.height !== maskHeight) {
             refinedMask.width = maskWidth;
@@ -316,9 +318,11 @@ function Studio({ onClose, onSaved, initial }) {
           if (!previousMaskAlpha || previousMaskAlpha.length !== maskWidth * maskHeight) previousMaskAlpha = new Uint8ClampedArray(maskWidth * maskHeight);
           for (let pixel = 0, alphaIndex = 0; pixel < maskData.data.length; pixel += 4, alphaIndex += 1) {
             const confidence = Math.max(maskData.data[pixel], maskData.data[pixel + 1], maskData.data[pixel + 2]) / 255;
-            const normalized = clamp((confidence - .56) / .24, 0, 1);
+            // Reject low-confidence background pixels aggressively. Bright
+            // backlights otherwise get carried into the cutout as an aura.
+            const normalized = clamp((confidence - .68) / .22, 0, 1);
             const softened = normalized * normalized * (3 - 2 * normalized);
-            const alpha = Math.round((previousMaskAlpha[alphaIndex] * .32) + (softened * 255 * .68));
+            const alpha = Math.round((previousMaskAlpha[alphaIndex] * .16) + (softened * 255 * .84));
             previousMaskAlpha[alphaIndex] = alpha;
             maskData.data[pixel] = 255;
             maskData.data[pixel + 1] = 255;
@@ -331,9 +335,7 @@ function Studio({ onClose, onSaved, initial }) {
           context.save();
           context.imageSmoothingEnabled = true;
           context.imageSmoothingQuality = 'high';
-          context.filter = 'blur(0.8px)';
           context.drawImage(refinedMask, 0, 0, output.width, output.height);
-          context.filter = 'none';
           context.globalCompositeOperation = 'source-in';
           context.drawImage(results.image, 0, 0, output.width, output.height);
           context.globalCompositeOperation = 'destination-over';
