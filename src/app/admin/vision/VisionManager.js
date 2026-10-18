@@ -286,6 +286,9 @@ function Studio({ onClose, onSaved, initial }) {
     setCameraBackgroundBusy(true);
     const backgroundImage = new Image();
     backgroundImage.src = cameraBackgroundSource;
+    const refinedMask = document.createElement('canvas');
+    const refinedMaskContext = refinedMask.getContext('2d', { willReadFrequently: true });
+    let previousMaskAlpha = null;
     const run = async () => {
       try {
         await backgroundImage.decode();
@@ -300,10 +303,37 @@ function Studio({ onClose, onSaved, initial }) {
           if (!output || !video?.videoWidth || !results.segmentationMask) return;
           output.width = video.videoWidth;
           output.height = video.videoHeight;
+          const maskWidth = Math.min(384, video.videoWidth);
+          const maskHeight = Math.max(1, Math.round(maskWidth * video.videoHeight / video.videoWidth));
+          if (refinedMask.width !== maskWidth || refinedMask.height !== maskHeight) {
+            refinedMask.width = maskWidth;
+            refinedMask.height = maskHeight;
+            previousMaskAlpha = null;
+          }
+          refinedMaskContext.clearRect(0, 0, maskWidth, maskHeight);
+          refinedMaskContext.drawImage(results.segmentationMask, 0, 0, maskWidth, maskHeight);
+          const maskData = refinedMaskContext.getImageData(0, 0, maskWidth, maskHeight);
+          if (!previousMaskAlpha || previousMaskAlpha.length !== maskWidth * maskHeight) previousMaskAlpha = new Uint8ClampedArray(maskWidth * maskHeight);
+          for (let pixel = 0, alphaIndex = 0; pixel < maskData.data.length; pixel += 4, alphaIndex += 1) {
+            const confidence = Math.max(maskData.data[pixel], maskData.data[pixel + 1], maskData.data[pixel + 2]) / 255;
+            const normalized = clamp((confidence - .56) / .24, 0, 1);
+            const softened = normalized * normalized * (3 - 2 * normalized);
+            const alpha = Math.round((previousMaskAlpha[alphaIndex] * .32) + (softened * 255 * .68));
+            previousMaskAlpha[alphaIndex] = alpha;
+            maskData.data[pixel] = 255;
+            maskData.data[pixel + 1] = 255;
+            maskData.data[pixel + 2] = 255;
+            maskData.data[pixel + 3] = alpha;
+          }
+          refinedMaskContext.putImageData(maskData, 0, 0);
           const context = output.getContext('2d');
           context.clearRect(0, 0, output.width, output.height);
           context.save();
-          context.drawImage(results.segmentationMask, 0, 0, output.width, output.height);
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
+          context.filter = 'blur(0.8px)';
+          context.drawImage(refinedMask, 0, 0, output.width, output.height);
+          context.filter = 'none';
           context.globalCompositeOperation = 'source-in';
           context.drawImage(results.image, 0, 0, output.width, output.height);
           context.globalCompositeOperation = 'destination-over';
