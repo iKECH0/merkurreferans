@@ -289,6 +289,7 @@ function Studio({ onClose, onSaved, initial }) {
     const refinedMask = document.createElement('canvas');
     const refinedMaskContext = refinedMask.getContext('2d', { willReadFrequently: true });
     let previousMaskAlpha = null;
+    let currentMaskAlpha = null;
     const run = async () => {
       try {
         await backgroundImage.decode();
@@ -311,23 +312,43 @@ function Studio({ onClose, onSaved, initial }) {
             refinedMask.width = maskWidth;
             refinedMask.height = maskHeight;
             previousMaskAlpha = null;
+            currentMaskAlpha = null;
           }
           refinedMaskContext.clearRect(0, 0, maskWidth, maskHeight);
           refinedMaskContext.drawImage(results.segmentationMask, 0, 0, maskWidth, maskHeight);
           const maskData = refinedMaskContext.getImageData(0, 0, maskWidth, maskHeight);
-          if (!previousMaskAlpha || previousMaskAlpha.length !== maskWidth * maskHeight) previousMaskAlpha = new Uint8ClampedArray(maskWidth * maskHeight);
+          const maskPixelCount = maskWidth * maskHeight;
+          if (!previousMaskAlpha || previousMaskAlpha.length !== maskPixelCount) previousMaskAlpha = new Uint8ClampedArray(maskPixelCount);
+          if (!currentMaskAlpha || currentMaskAlpha.length !== maskPixelCount) currentMaskAlpha = new Uint8ClampedArray(maskPixelCount);
           for (let pixel = 0, alphaIndex = 0; pixel < maskData.data.length; pixel += 4, alphaIndex += 1) {
             const confidence = Math.max(maskData.data[pixel], maskData.data[pixel + 1], maskData.data[pixel + 2]) / 255;
-            // Reject low-confidence background pixels aggressively. Bright
-            // backlights otherwise get carried into the cutout as an aura.
-            const normalized = clamp((confidence - .68) / .22, 0, 1);
-            const softened = normalized * normalized * (3 - 2 * normalized);
-            const alpha = Math.round((previousMaskAlpha[alphaIndex] * .16) + (softened * 255 * .84));
-            previousMaskAlpha[alphaIndex] = alpha;
-            maskData.data[pixel] = 255;
-            maskData.data[pixel + 1] = 255;
-            maskData.data[pixel + 2] = 255;
-            maskData.data[pixel + 3] = alpha;
+            // Keep a broad confidence ramp here. A hard threshold turns the
+            // edge into a jagged, bright outline around hair and shoulders.
+            const normalized = clamp((confidence - .5) / .38, 0, 1);
+            currentMaskAlpha[alphaIndex] = Math.round(normalized * normalized * (3 - 2 * normalized) * 255);
+          }
+          for (let y = 0; y < maskHeight; y += 1) {
+            for (let x = 0; x < maskWidth; x += 1) {
+              const alphaIndex = y * maskWidth + x;
+              // A one-pixel inward cleanup discards the original room colour
+              // that segmentation commonly leaves on the outside edge. The
+              // confidence ramp above still provides a smooth inner feather.
+              let cleanedAlpha = 255;
+              for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+                const sampleY = clamp(y + offsetY, 0, maskHeight - 1);
+                for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+                  const sampleX = clamp(x + offsetX, 0, maskWidth - 1);
+                  cleanedAlpha = Math.min(cleanedAlpha, currentMaskAlpha[sampleY * maskWidth + sampleX]);
+                }
+              }
+              const alpha = Math.round((previousMaskAlpha[alphaIndex] * .35) + (cleanedAlpha * .65));
+              const pixel = alphaIndex * 4;
+              previousMaskAlpha[alphaIndex] = alpha;
+              maskData.data[pixel] = 255;
+              maskData.data[pixel + 1] = 255;
+              maskData.data[pixel + 2] = 255;
+              maskData.data[pixel + 3] = alpha;
+            }
           }
           refinedMaskContext.putImageData(maskData, 0, 0);
           const context = output.getContext('2d');
