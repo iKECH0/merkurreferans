@@ -2,18 +2,18 @@
 .hero h2 { font-size:2rem; margin:5px 0 8px; }
 .hero p { color:#94a3b8; margin:0; }
 .eyebrow { font-size:.75rem; text-transform:uppercase; letter-spacing:.12em; color:#60a5fa; font-weight:800; }
-.primaryButton,.headerButton,.iconButton { border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:10px; font-weight:700; white-space:nowrap; }
-.primaryButton { padding:11px 16px; background:linear-gradient(135deg,#2563eb,#4f46e5); color:white; }
-.headerButton { padding:9px 12px; background:#e2e8f0; color:#0f172a; }
+.primaryButton,.headerButton,.iconButton { border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; border-radius:8px; font-weight:700; font-size:.76rem; white-space:nowrap; }
+.primaryButton { padding:6px 12px; background:linear-gradient(135deg,#2563eb,#4f46e5); color:white; }
+.headerButton { padding:6px 9px; background:#e2e8f0; color:#0f172a; }
 .cropActive { background:#f59e0b; color:#451a03; box-shadow:0 0 0 3px rgba(245,158,11,.24); }
 .cropActive:hover:not(:disabled) { background:#d97706; color:#fff; }
-.primaryButton:hover:not(:disabled) { background:linear-gradient(135deg,#1d4ed8,#4338ca); color:#fff; box-shadow:0 6px 16px rgba(37,99,235,.24); }
+.primaryButton:hover:not(:disabled) { background:linear-gradient(135deg,#1d4ed8,#4338ca); color:#fff; box-shadow:0 4px 12px rgba(37,99,235,.24); }
 .headerButton:hover:not(:disabled) { background:#cbd5e1; color:#020617; }
 .iconButton:hover:not(:disabled) { background:#dbeafe; color:#1d4ed8; }
-.primaryButton:focus-visible,.headerButton:focus-visible,.iconButton:focus-visible { outline:3px solid #93c5fd; outline-offset:2px; }
+.primaryButton:focus-visible,.headerButton:focus-visible,.iconButton:focus-visible { outline:2px solid #93c5fd; outline-offset:1px; }
 .primaryButton:disabled,.headerButton:disabled,.iconButton:disabled { opacity:.58; cursor:not-allowed; }
 .disabledButton { opacity:.58; cursor:wait; }
-.iconButton { padding:9px; background:#f1f5f9; color:#334155; }
+.iconButton { padding:6px 8px; background:#f1f5f9; color:#334155; }
 .listPanel { background:rgba(15,23,42,.65); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:20px; }
 .listHeader { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 .listHeader h3 { margin:0; }
@@ -31,10 +31,10 @@
 .deleteButton { color:#ef4444!important; background:rgba(239,68,68,.1)!important; }
 .downloadLink { display:grid; place-items:center; border-radius:8px; padding:8px 10px; color:#60a5fa; background:rgba(37,99,235,.14); text-decoration:none; }
 .studio { position:fixed; inset:0; z-index:100; background:#0b1220; color:#0f172a; display:flex; flex-direction:column; }
-.studioHeader { min-height:64px; background:rgba(255,255,255,.98); display:flex; align-items:center; gap:9px; padding:9px 14px; overflow-x:auto; border-bottom:1px solid #dbe3ef; box-shadow:0 4px 20px rgba(2,6,23,.18); }
-.titleInput { min-width:180px; flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:10px; font-weight:700; }
-.studioHeader select { padding:9px; border:1px solid #cbd5e1; border-radius:9px; }
-.recordingButton { border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:10px; font-weight:800; padding:9px 12px; background:#dc2626; color:#fff; animation:pulse 1.2s infinite; white-space:nowrap; }
+.studioHeader { min-height:48px; background:rgba(255,255,255,.98); display:flex; align-items:center; gap:6px; padding:6px 10px; overflow-x:auto; border-bottom:1px solid #dbe3ef; box-shadow:0 2px 12px rgba(2,6,23,.1); }
+.titleInput { min-width:110px; max-width:180px; flex:1; padding:6px 9px; border:1px solid #cbd5e1; border-radius:8px; font-weight:700; font-size:.78rem; }
+.studioHeader select { padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:.76rem; font-weight:600; }
+.recordingButton { border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; border-radius:8px; font-weight:800; font-size:.76rem; padding:6px 10px; background:#dc2626; color:#fff; animation:pulse 1.2s infinite; white-space:nowrap; }
 .workspace { display:grid; grid-template-columns:224px minmax(0,1fr) 186px; min-height:0; flex:1; }
 .toolbar { background:linear-gradient(180deg,#fff 0%,#f8fafc 100%); padding:14px 12px; overflow-y:auto; border-right:1px solid #dbe3ef; box-shadow:8px 0 24px rgba(2,6,23,.08); scrollbar-width:thin; scrollbar-color:#cbd5e1 transparent; }
 .toolbarBrand { display:flex; align-items:center; gap:10px; margin:0 2px 14px; padding:10px; border-radius:14px; color:#0f172a; background:linear-gradient(135deg,#eff6ff,#eef2ff); border:1px solid #dbeafe; }
@@ -46,6 +46,8 @@
 .cameraBackgroundGrid button { position:relative; aspect-ratio:1.35; overflow:hidden; padding:0; border:2px solid #dbe3ef; border-radius:9px; color:#475569; background:#f1f5f9 center/cover no-repeat; cursor:pointer; }
 .cameraBackgroundGrid button span { position:absolute; inset:auto 2px 2px; padding:2px; border-radius:4px; color:#fff; background:rgba(15,23,42,.72); font-size:.52rem; font-weight:900; }
 .cameraBackgroundGrid .activeCameraBackground,.cameraBackgroundUpload.activeCameraBackground { border-color:#2563eb; box-shadow:0 0 0 2px #bfdbfe; }
+.fonsuzButton { display:flex!important; flex-direction:column; align-items:center; justify-content:center; background:#f8fafc!important; border-style:dashed!important; }
+.fonsuzIcon { font-size:.82rem; line-height:1; margin-bottom:2px; }
 .cameraBackgroundUpload { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:7px; padding:8px; border:1px dashed #93c5fd; border-radius:9px; color:#1d4ed8; background:#eff6ff; cursor:pointer; font-size:.62rem; font-weight:900; }
 .cameraBackgroundStatus { display:flex; align-items:center; gap:6px; margin-top:7px; color:#475569; font-size:.58rem; font-weight:800; }
 .cameraBackgroundStatus span { width:7px; height:7px; border-radius:50%; background:#2563eb; animation:pulse 1s infinite; }

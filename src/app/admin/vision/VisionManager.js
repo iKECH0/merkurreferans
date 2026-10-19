@@ -76,24 +76,34 @@ function drawAction(ctx, action) {
       ctx.lineTo(last.x, last.y);
       ctx.stroke();
     } else {
-      let segmentStart = first;
-      for (let index = 1; index < action.points.length; index += 1) {
-        const current = action.points[index];
-        const next = action.points[index + 1] || current;
-        const midpoint = { x: (current.x + next.x) / 2, y: (current.y + next.y) / 2 };
-        if (action.tool === 'pen' && action.pressureEnabled !== false) {
-          const pressure = Number.isFinite(current.pressure) && current.pressure > 0 ? current.pressure : 0.5;
-          const previousPressure = Number.isFinite(action.points[index - 1]?.pressure) ? action.points[index - 1].pressure : pressure;
-          const smoothedPressure = previousPressure * .65 + pressure * .35;
-          const pressureRange = action.penStyle === 'fountain' ? 0.8 : action.penStyle === 'technical' ? 0.22 : 0.48;
-          const pressureBase = action.penStyle === 'fountain' ? 0.55 : action.penStyle === 'technical' ? 0.9 : 0.76;
-          ctx.lineWidth = action.size * (pressureBase + smoothedPressure * pressureRange);
-        }
+      const isFountain = action.tool === 'pen' && action.pressureEnabled && action.penStyle === 'fountain';
+      if (!isFountain || action.points.length < 3) {
         ctx.beginPath();
-        ctx.moveTo(segmentStart.x, segmentStart.y);
-        ctx.quadraticCurveTo(current.x, current.y, midpoint.x, midpoint.y);
+        ctx.moveTo(first.x, first.y);
+        for (let index = 1; index < action.points.length - 1; index += 1) {
+          const current = action.points[index];
+          const next = action.points[index + 1];
+          ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+        }
+        ctx.lineTo(last.x, last.y);
         ctx.stroke();
-        segmentStart = midpoint;
+      } else {
+        let segmentStart = first;
+        let lastWidth = ctx.lineWidth;
+        for (let index = 1; index < action.points.length; index += 1) {
+          const current = action.points[index];
+          const next = action.points[index + 1] || current;
+          const midpoint = { x: (current.x + next.x) / 2, y: (current.y + next.y) / 2 };
+          const p = Number.isFinite(current.pressure) && current.pressure > 0 ? current.pressure : 0.5;
+          const targetWidth = action.size * (0.65 + p * 0.7);
+          lastWidth = lastWidth * 0.65 + targetWidth * 0.35;
+          ctx.lineWidth = lastWidth;
+          ctx.beginPath();
+          ctx.moveTo(segmentStart.x, segmentStart.y);
+          ctx.quadraticCurveTo(current.x, current.y, midpoint.x, midpoint.y);
+          ctx.stroke();
+          segmentStart = midpoint;
+        }
       }
     }
   } else if (action.tool === 'line') {
@@ -162,16 +172,39 @@ function drawQuestionImage(ctx, image, width, height, format, questionScale, que
   ctx.restore();
 }
 
+let cachedLayerCanvas = null;
+function getSharedLayerCanvas(width, height) {
+  if (typeof document === 'undefined') return null;
+  if (!cachedLayerCanvas) cachedLayerCanvas = document.createElement('canvas');
+  if (cachedLayerCanvas.width !== width || cachedLayerCanvas.height !== height) {
+    cachedLayerCanvas.width = width;
+    cachedLayerCanvas.height = height;
+  }
+  return cachedLayerCanvas;
+}
+
 function drawActionsLayer(ctx, actions, width, height, pixelRatio = 1) {
-  const ratio = Math.max(1, Math.min(3, pixelRatio || 1));
-  const layer = document.createElement('canvas');
-  layer.width = Math.max(1, Math.round(width * ratio));
-  layer.height = Math.max(1, Math.round(height * ratio));
+  if (!actions?.length) return;
+  const hasEraser = actions.some((a) => a.tool === 'eraser');
+  if (!hasEraser) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    actions.forEach((action) => drawAction(ctx, action));
+    ctx.restore();
+    return;
+  }
+  const ratio = Math.max(1, Math.min(2.5, pixelRatio || 1));
+  const targetW = Math.max(1, Math.round(width * ratio));
+  const targetH = Math.max(1, Math.round(height * ratio));
+  const layer = getSharedLayerCanvas(targetW, targetH);
+  if (!layer) return;
   const layerContext = layer.getContext('2d');
+  layerContext.clearRect(0, 0, targetW, targetH);
   layerContext.setTransform(ratio, 0, 0, ratio, 0, 0);
   layerContext.imageSmoothingEnabled = true;
   layerContext.imageSmoothingQuality = 'high';
-  actions?.forEach((action) => drawAction(layerContext, action));
+  actions.forEach((action) => drawAction(layerContext, action));
   ctx.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, width, height);
 }
 
@@ -197,6 +230,8 @@ function Studio({ onClose, onSaved, initial }) {
   const brandBackgroundRef = useRef(null);
   const backgroundImageRef = useRef(null);
   const startedAt = useRef(Date.now());
+  const cameraBackgroundSourceRef = useRef(null);
+  const drawCompositeFrameRef = useRef(null);
   const initialData = initial?.data || {};
   const [title, setTitle] = useState(initial?.title || 'Yeni Vizyon Dersi');
   const [format, setFormat] = useState(initial?.format || '1:1');
@@ -215,7 +250,11 @@ function Studio({ onClose, onSaved, initial }) {
   const [saving, setSaving] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraBackground, setCameraBackground] = useState(initialData.cameraBackground || 'none');
-  const [cameraBackgroundSource, setCameraBackgroundSource] = useState(() => CAMERA_BACKGROUNDS.find((item) => item.id === initialData.cameraBackground)?.source || null);
+  const [cameraBackgroundSource, setCameraBackgroundSource] = useState(() => {
+    const src = CAMERA_BACKGROUNDS.find((item) => item.id === initialData.cameraBackground)?.source || null;
+    cameraBackgroundSourceRef.current = src;
+    return src;
+  });
   const [cameraBackgroundBusy, setCameraBackgroundBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
@@ -271,13 +310,19 @@ function Studio({ onClose, onSaved, initial }) {
   }, [page?.background, format]);
 
   useEffect(() => {
+    cameraBackgroundSourceRef.current = cameraBackgroundSource;
     if (!cameraOn || !cameraBackgroundSource) {
       cameraCompositeReadyRef.current = false;
       setCameraBackgroundBusy(false);
       if (cameraSegmentationFrameRef.current) cancelAnimationFrame(cameraSegmentationFrameRef.current);
       cameraSegmentationFrameRef.current = null;
-      cameraSegmentationRef.current?.close?.();
+      try { cameraSegmentationRef.current?.close?.(); } catch (e) { /* ignore */ }
       cameraSegmentationRef.current = null;
+      const output = cameraCompositeRef.current;
+      if (output) {
+        const ctx = output.getContext('2d');
+        ctx?.clearRect(0, 0, output.width, output.height);
+      }
       return;
     }
     let cancelled = false;
@@ -392,8 +437,13 @@ function Studio({ onClose, onSaved, initial }) {
       cameraCompositeReadyRef.current = false;
       if (cameraSegmentationFrameRef.current) cancelAnimationFrame(cameraSegmentationFrameRef.current);
       cameraSegmentationFrameRef.current = null;
-      cameraSegmentationRef.current?.close?.();
+      try { cameraSegmentationRef.current?.close?.(); } catch (e) { /* ignore */ }
       cameraSegmentationRef.current = null;
+      const output = cameraCompositeRef.current;
+      if (output) {
+        const ctx = output.getContext('2d');
+        ctx?.clearRect(0, 0, output.width, output.height);
+      }
     };
   }, [cameraOn, cameraBackgroundSource]);
 
@@ -493,7 +543,7 @@ function Studio({ onClose, onSaved, initial }) {
       const nextPoint = point(pointerEvent);
       const previousPoint = activeRef.current.points[activeRef.current.points.length - 1];
       const distance = Math.hypot(nextPoint.x - previousPoint.x, nextPoint.y - previousPoint.y);
-      if (distance >= 0.12) activeRef.current.points.push(nextPoint);
+      if (distance >= 1.2) activeRef.current.points.push(nextPoint);
     });
     if (!drawingFrameRef.current) {
       drawingFrameRef.current = requestAnimationFrame(() => {
@@ -692,7 +742,22 @@ function Studio({ onClose, onSaved, initial }) {
 
   const selectCameraBackground = (item) => {
     setCameraBackground(item.id);
-    setCameraBackgroundSource(item.source);
+    const source = item.id === 'none' ? null : item.source;
+    setCameraBackgroundSource(source);
+    cameraBackgroundSourceRef.current = source;
+    if (!source) {
+      cameraCompositeReadyRef.current = false;
+      setCameraBackgroundBusy(false);
+      if (cameraSegmentationFrameRef.current) {
+        cancelAnimationFrame(cameraSegmentationFrameRef.current);
+        cameraSegmentationFrameRef.current = null;
+      }
+      const output = cameraCompositeRef.current;
+      if (output) {
+        const ctx = output.getContext('2d');
+        ctx?.clearRect(0, 0, output.width, output.height);
+      }
+    }
   };
   const uploadCameraBackground = (event) => {
     const file = event.target.files?.[0];
@@ -704,6 +769,7 @@ function Studio({ onClose, onSaved, initial }) {
     reader.onload = () => {
       setCameraBackground('custom');
       setCameraBackgroundSource(reader.result);
+      cameraBackgroundSourceRef.current = reader.result;
       toast.success('Özel kamera fonu hazırlandı.');
     };
     reader.readAsDataURL(file);
@@ -734,7 +800,7 @@ function Studio({ onClose, onSaved, initial }) {
       const y = Math.round(output.height * layout.y / 100);
       const width = Math.round(output.width * layout.width / 100);
       const height = Math.round(output.height * layout.height / 100);
-      const processedCamera = cameraBackgroundSource && cameraCompositeReadyRef.current ? cameraCompositeRef.current : null;
+      const processedCamera = cameraBackgroundSourceRef.current && cameraCompositeReadyRef.current ? cameraCompositeRef.current : null;
       const cameraSource = processedCamera || video;
       const sourceWidth = processedCamera?.width || video.videoWidth;
       const sourceHeight = processedCamera?.height || video.videoHeight;
@@ -755,6 +821,7 @@ function Studio({ onClose, onSaved, initial }) {
       ctx.restore();
     }
   };
+  drawCompositeFrameRef.current = drawCompositeFrame;
 
   const startRecording = async () => {
     if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast.error('Tarayıcınız video kaydını desteklemiyor.');
@@ -817,7 +884,7 @@ function Studio({ onClose, onSaved, initial }) {
       };
       const frame = () => {
         if (recordingSessionRef.current !== sessionId || recorder.state === 'inactive') return;
-        drawCompositeFrame(output, canvasRef.current, cameraRef.current);
+        (drawCompositeFrameRef.current || drawCompositeFrame)(output, canvasRef.current, cameraRef.current);
         recordingFrameRef.current = requestAnimationFrame(frame);
       };
       recorderRef.current = recorder;
@@ -946,18 +1013,18 @@ function Studio({ onClose, onSaved, initial }) {
 
   return <div className={styles.studio}>
     <div className={styles.studioHeader}>
-      <button className={styles.iconButton} onClick={onClose} title="Geri"><ArrowLeft size={20} /></button>
+      <button className={styles.iconButton} onClick={onClose} title="Geri"><ArrowLeft size={16} /></button>
       <input className={styles.titleInput} value={title} maxLength={180} onChange={(e) => setTitle(e.target.value)} />
       <select value={format} onChange={(e) => { const nextFormat = e.target.value; setFormat(nextFormat); if (DEFAULT_BACKGROUNDS[nextFormat] && color === '#111827') setColor('#ffffff'); else if (!DEFAULT_BACKGROUNDS[nextFormat] && color === '#ffffff') setColor('#111827'); }}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
-      <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={18} /> {documentLoading ? 'PDF hazırlanıyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
-      {page?.background && <button className={`${styles.headerButton} ${cropMode ? styles.cropActive : ''}`} onClick={() => { setCropMode((value) => !value); setCropSelection(null); cropSelectionRef.current = null; }} title="Tahta üzerinde kırpılacak alanı sürükleyerek seçin"><Crop size={18} /> {cropMode ? 'Kırpmayı İptal Et' : 'PDF / Görsel Kırp'}</button>}
-      {!!page?.backgroundHistory?.length && <button className={styles.headerButton} onClick={undoCrop} title="Son kırpmayı geri al"><RotateCcw size={18} /> Kırpmayı Geri Al</button>}
-      <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={18} /> : <Video size={18} />} Kamera</button>
-      <button disabled={isFinalizingRecording} title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={18} /> {isFinalizingRecording ? 'Video hazırlanıyor…' : isRecording ? 'Kaydı Bitir' : recordedBlob ? 'Yeni Kayıt Başlat' : 'Kayıt Başlat'}</button>
-      {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo}><Download size={18} /> Videoyu indir</button>}
-      <button className={styles.headerButton} onClick={downloadImage}><Download size={18} /> PNG indir</button>
-      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')}><Save size={18} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</button>
-      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')}><Save size={18} /> {saving && uploadProgress ? `Video yükleniyor %${uploadProgress}` : 'Kaydet ve Yayımla'}</button>
+      <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={15} /> {documentLoading ? 'Yükleniyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
+      {page?.background && <button className={`${styles.headerButton} ${cropMode ? styles.cropActive : ''}`} onClick={() => { setCropMode((value) => !value); setCropSelection(null); cropSelectionRef.current = null; }} title="Tahta üzerinde kırpılacak alanı sürükleyerek seçin"><Crop size={15} /> {cropMode ? 'Kırp İptal' : 'Kırp'}</button>}
+      {!!page?.backgroundHistory?.length && <button className={styles.headerButton} onClick={undoCrop} title="Son kırpmayı geri al"><RotateCcw size={15} /> Geri Al</button>}
+      <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={15} /> : <Video size={15} />} Kamera</button>
+      <button disabled={isFinalizingRecording} title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={15} /> {isFinalizingRecording ? 'Hazırlanıyor…' : isRecording ? 'Kaydı Bitir' : recordedBlob ? 'Yeni Kayıt' : 'Kayıt'}</button>
+      {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo} title="Videoyu indir"><Download size={15} /> Video</button>}
+      <button className={styles.headerButton} onClick={downloadImage} title="PNG indir"><Download size={15} /> PNG</button>
+      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')} title="Taslak olarak kaydet"><Save size={15} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</button>
+      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')} title="Kaydet ve yayımla"><Save size={15} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Yayımla'}</button>
     </div>
     <div className={styles.workspace}>
       <aside className={styles.toolbar}>
@@ -965,7 +1032,7 @@ function Studio({ onClose, onSaved, initial }) {
         <section className={styles.toolSection}>
           <p>Kamera Fonu</p>
           <div className={styles.cameraBackgroundGrid}>
-            {CAMERA_BACKGROUNDS.map((item) => <button key={item.id} className={cameraBackground === item.id ? styles.activeCameraBackground : ''} onClick={() => selectCameraBackground(item)} title={item.label} style={item.source ? { backgroundImage: `url(${item.source})` } : undefined}><span>{item.label}</span></button>)}
+            {CAMERA_BACKGROUNDS.map((item) => <button key={item.id} className={`${cameraBackground === item.id ? styles.activeCameraBackground : ''} ${item.id === 'none' ? styles.fonsuzButton : ''}`} onClick={() => selectCameraBackground(item)} title={item.label} style={item.source ? { backgroundImage: `url(${item.source})` } : undefined}>{item.id === 'none' && <span className={styles.fonsuzIcon}>🚫</span>}<span>{item.label}</span></button>)}
           </div>
           <label className={`${styles.cameraBackgroundUpload} ${cameraBackground === 'custom' ? styles.activeCameraBackground : ''}`}><ImagePlus size={16} /><span>{cameraBackground === 'custom' ? 'Özel Fon Seçili' : 'Özel Fon Yükle'}</span><input hidden type="file" accept="image/*" onChange={uploadCameraBackground} /></label>
           {cameraBackgroundBusy && <div className={styles.cameraBackgroundStatus}><span /> Kişi fondan ayrılıyor…</div>}
