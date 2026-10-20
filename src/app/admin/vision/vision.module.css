@@ -27,9 +27,19 @@
 .published { background:rgba(16,185,129,.15); color:#34d399; }
 .draft { background:rgba(245,158,11,.15); color:#fbbf24; }
 .cardActions { display:flex; gap:8px; }
-.cardActions button { border:0; border-radius:8px; padding:8px 12px; cursor:pointer; }
+.cardActions button { border:0; border-radius:8px; padding:8px 12px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
 .deleteButton { color:#ef4444!important; background:rgba(239,68,68,.1)!important; }
 .downloadLink { display:grid; place-items:center; border-radius:8px; padding:8px 10px; color:#60a5fa; background:rgba(37,99,235,.14); text-decoration:none; }
+.videoModalBackdrop { position:fixed; inset:0; z-index:300; display:grid; place-items:center; padding:24px; background:rgba(2,6,23,.82); backdrop-filter:blur(8px); }
+.videoModal { width:min(920px,96vw); max-height:92vh; overflow:hidden; border:1px solid rgba(148,163,184,.3); border-radius:18px; background:#0f172a; box-shadow:0 28px 90px rgba(0,0,0,.55); }
+.videoModalHeader { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px; color:#fff; }
+.videoModalHeader span { color:#60a5fa; font-size:.68rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+.videoModalHeader h3 { margin:3px 0 0; font-size:1rem; }
+.videoModalHeader button { width:34px; height:34px; border:0; border-radius:50%; color:#e2e8f0; background:#1e293b; cursor:pointer; font-size:1.5rem; line-height:1; }
+.videoModal video { display:block; width:100%; max-height:68vh; background:#000; }
+.videoModalFooter { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; }
+.videoModalFooter a,.videoModalFooter button { display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border:0; border-radius:8px; color:#fff; background:#2563eb; text-decoration:none; cursor:pointer; font-weight:800; font-size:.75rem; }
+.videoModalFooter button { color:#cbd5e1; background:#334155; }
 .studio { position:fixed; inset:0; z-index:100; background:#0b1220; color:#0f172a; display:flex; flex-direction:column; }
 .studioHeader { min-height:42px; background:rgba(255,255,255,.98); display:flex; align-items:center; gap:4px; padding:4px 7px; overflow:hidden; border-bottom:1px solid #dbe3ef; box-shadow:0 2px 12px rgba(2,6,23,.1); }
 .titleInput { min-width:92px; max-width:155px; flex:1 1 155px; padding:5px 7px; border:1px solid #cbd5e1; border-radius:7px; font-weight:700; font-size:.72rem; }
@@ -105,10 +115,16 @@
 .canvasShell canvas.moveCursor:active { cursor:grabbing; }
 .questionSelection { position:absolute; z-index:3; border:2px solid #3b82f6; box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 0 9999px rgba(37,99,235,.035); cursor:move; touch-action:none; }
 .resizeHandle { position:absolute; width:18px; height:18px; padding:0; border:3px solid #fff; border-radius:5px; background:#2563eb; box-shadow:0 2px 8px rgba(15,23,42,.35); pointer-events:auto; touch-action:none; }
-.resizeHandle.topleft { left:-10px; top:-10px; cursor:nwse-resize; }
-.resizeHandle.topright { right:-10px; top:-10px; cursor:nesw-resize; }
-.resizeHandle.bottomleft { left:-10px; bottom:-10px; cursor:nesw-resize; }
-.resizeHandle.bottomright { right:-10px; bottom:-10px; cursor:nwse-resize; }
+.questiontop,.questionbottom { left:25%; width:50%; height:9px; border-radius:999px; cursor:ns-resize; }
+.questiontop { top:-6px; }
+.questionbottom { bottom:-6px; }
+.questionleft,.questionright { top:25%; width:9px; height:50%; border-radius:999px; cursor:ew-resize; }
+.questionleft { left:-6px; }
+.questionright { right:-6px; }
+.questiontopleft { left:-10px; top:-10px; cursor:nwse-resize; }
+.questiontopright { right:-10px; top:-10px; cursor:nesw-resize; }
+.questionbottomleft { left:-10px; bottom:-10px; cursor:nesw-resize; }
+.questionbottomright { right:-10px; bottom:-10px; cursor:nwse-resize; }
 .cropSelection { position:absolute; z-index:4; pointer-events:none; border:3px solid #f59e0b; background:rgba(245,158,11,.13); box-shadow:0 0 0 9999px rgba(15,23,42,.38),0 0 0 1px #fff inset; }
 .cropSelection::before,.cropSelection::after { content:''; position:absolute; background:rgba(255,255,255,.8); }
 .cropSelection::before { left:33.333%; top:0; width:1px; height:100%; box-shadow:calc(100% + 33.333%) 0 0 rgba(255,255,255,.8); }

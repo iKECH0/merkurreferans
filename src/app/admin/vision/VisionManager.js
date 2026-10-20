@@ -134,7 +134,7 @@ function drawBackground(ctx, image, width, height) {
   ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
-function getQuestionImageRect(image, width, height, format, requestedScale = 1.25, positionX = 0, positionY = 0) {
+function getQuestionImageRect(image, width, height, format, requestedScale = 1.25, positionX = 0, positionY = 0, requestedWidthScale, requestedHeightScale) {
   const regions = {
     '16:9': { x: width * .19, y: height * .23, width: width * .74, height: height * .33 },
     '9:16': { x: width * .08, y: height * .25, width: width * .84, height: height * .46 },
@@ -143,9 +143,10 @@ function getQuestionImageRect(image, width, height, format, requestedScale = 1.2
   const region = regions[format] || { x: width * .07, y: height * .09, width: width * .86, height: height * .82 };
   const fitScale = Math.min(region.width / image.width, region.height / image.height);
   const questionScale = Math.min(5, Math.max(.25, Number(requestedScale) || 1.25));
-  const scale = fitScale * questionScale;
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
+  const widthScale = Math.min(5, Math.max(.25, Number(requestedWidthScale) || questionScale));
+  const heightScale = Math.min(5, Math.max(.25, Number(requestedHeightScale) || questionScale));
+  const drawWidth = image.width * fitScale * widthScale;
+  const drawHeight = image.height * fitScale * heightScale;
   const offsetX = Math.min(50, Math.max(-50, Number(positionX) || 0)) / 100 * width * .55;
   const offsetY = Math.min(50, Math.max(-50, Number(positionY) || 0)) / 100 * height * .55;
   const centerX = region.x + region.width / 2 + offsetX;
@@ -163,9 +164,9 @@ function getQuestionImageRect(image, width, height, format, requestedScale = 1.2
   };
 }
 
-function drawQuestionImage(ctx, image, width, height, format, questionScale, questionX, questionY) {
+function drawQuestionImage(ctx, image, width, height, format, questionScale, questionX, questionY, questionWidthScale, questionHeightScale) {
   if (!image?.width || !image?.height) return;
-  const rect = getQuestionImageRect(image, width, height, format, questionScale, questionX, questionY);
+  const rect = getQuestionImageRect(image, width, height, format, questionScale, questionX, questionY, questionWidthScale, questionHeightScale);
   const padding = Math.max(8, Math.min(width, height) * .012);
   const radius = Math.max(10, Math.min(width, height) * .018);
   ctx.save();
@@ -430,7 +431,7 @@ function Studio({ onClose, onSaved, initial }) {
         const processFrame = async (timestamp = 0) => {
           if (cancelled) return;
           const video = cameraRef.current;
-          if (!processing && video?.readyState >= 2 && timestamp - lastProcessedAt >= SEGMENTATION_FRAME_INTERVAL) {
+          if (!processing && !activeRef.current && video?.readyState >= 2 && timestamp - lastProcessedAt >= SEGMENTATION_FRAME_INTERVAL) {
             lastProcessedAt = timestamp;
             processing = true;
             try { await segmenter.send({ image: video }); } catch (error) { console.error('Camera background processing failed:', error); }
@@ -466,9 +467,11 @@ function Studio({ onClose, onSaved, initial }) {
     const canvas = canvasRef.current;
     if (!canvas || !page) return;
     const rect = canvas.getBoundingClientRect();
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.round(rect.width * ratio));
-    canvas.height = Math.max(1, Math.round(rect.height * ratio));
+    const ratio = Math.min(window.devicePixelRatio || 1, cameraOn ? 1.5 : 2);
+    const targetWidth = Math.max(1, Math.round(rect.width * ratio));
+    const targetHeight = Math.max(1, Math.round(rect.height * ratio));
+    if (canvas.width !== targetWidth) canvas.width = targetWidth;
+    if (canvas.height !== targetHeight) canvas.height = targetHeight;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, rect.width, rect.height);
@@ -478,12 +481,12 @@ function Studio({ onClose, onSaved, initial }) {
       drawBackground(ctx, backgroundAsset.brandImage, rect.width, rect.height);
     }
     if (backgroundAsset?.questionSource === questionSource && backgroundAsset.questionImage?.complete) {
-      drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale, page.questionX, page.questionY);
+      drawQuestionImage(ctx, backgroundAsset.questionImage, rect.width, rect.height, format, page.questionScale, page.questionX, page.questionY, page.questionWidthScale, page.questionHeightScale);
     }
     const liveAction = activeRef.current?.points ? activeRef.current : null;
     const visibleActions = liveAction && !page.actions.some((action) => action.id === liveAction.id) ? [...page.actions, liveAction] : page.actions;
     drawActionsLayer(ctx, visibleActions, rect.width, rect.height, ratio);
-  }, [page, format, backgroundAsset, laserTick]);
+  }, [page, format, backgroundAsset, laserTick, cameraOn]);
 
   useEffect(() => { render(); }, [render]);
   useEffect(() => {
@@ -648,7 +651,7 @@ function Studio({ onClose, onSaved, initial }) {
   };
 
   const setQuestionScale = (questionScale) => {
-    setPages((old) => old.map((item) => item.id === page.id ? { ...item, questionScale } : item));
+    setPages((old) => old.map((item) => item.id === page.id ? { ...item, questionScale, questionWidthScale: questionScale, questionHeightScale: questionScale } : item));
   };
   const setQuestionLayout = (changes) => {
     setPages((old) => old.map((item) => item.id === page.id ? { ...item, ...changes } : item));
@@ -803,7 +806,7 @@ function Studio({ onClose, onSaved, initial }) {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
     if (brandImage?.complete) drawBackground(ctx, brandImage, canvasRect.width, canvasRect.height);
-    if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format, livePage?.questionScale, livePage?.questionX, livePage?.questionY);
+    if (questionImage?.complete) drawQuestionImage(ctx, questionImage, canvasRect.width, canvasRect.height, format, livePage?.questionScale, livePage?.questionX, livePage?.questionY, livePage?.questionWidthScale, livePage?.questionHeightScale);
     const recordingAction = activeRef.current?.points ? activeRef.current : null;
     const recordingActions = recordingAction ? [...(livePage?.actions || []).filter((action) => action.id !== recordingAction.id), recordingAction] : livePage?.actions;
     drawActionsLayer(ctx, recordingActions, canvasRect.width, canvasRect.height, Math.min(2, output.width / canvasRect.width));
@@ -950,22 +953,39 @@ function Studio({ onClose, onSaved, initial }) {
     link.click();
   };
 
-  const startQuestionResize = (event, corner) => {
+  const startQuestionResize = (event, edge) => {
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     const image = backgroundImageRef.current;
     const canvas = canvasRef.current;
     if (!image || !canvas) return;
-    const rect = getQuestionImageRect(image, canvas.clientWidth, canvas.clientHeight, format, page.questionScale, page.questionX, page.questionY);
-    questionResizeRef.current = { pointerId: event.pointerId, corner, startX: event.clientX, startY: event.clientY, startScale: page.questionScale || 1.25, width: rect.width, height: rect.height };
+    const rect = getQuestionImageRect(image, canvas.clientWidth, canvas.clientHeight, format, page.questionScale, page.questionX, page.questionY, page.questionWidthScale, page.questionHeightScale);
+    questionResizeRef.current = {
+      pointerId: event.pointerId, edge, startX: event.clientX, startY: event.clientY,
+      startWidthScale: page.questionWidthScale || page.questionScale || 1.25,
+      startHeightScale: page.questionHeightScale || page.questionScale || 1.25,
+      questionX: page.questionX || 0, questionY: page.questionY || 0,
+      width: rect.width, height: rect.height, canvasWidth: canvas.clientWidth, canvasHeight: canvas.clientHeight
+    };
   };
   const resizeQuestion = (event) => {
     const resize = questionResizeRef.current;
     if (!resize || resize.pointerId !== event.pointerId) return;
     event.stopPropagation();
-    const horizontal = (resize.corner.includes('right') ? 1 : -1) * (event.clientX - resize.startX) / Math.max(1, resize.width);
-    const vertical = (resize.corner.includes('bottom') ? 1 : -1) * (event.clientY - resize.startY) / Math.max(1, resize.height);
-    setQuestionScale(clamp(resize.startScale * (1 + (horizontal + vertical) / 2), .25, 5));
+    const dx = event.clientX - resize.startX;
+    const dy = event.clientY - resize.startY;
+    const changes = {};
+    if (resize.edge.includes('left') || resize.edge.includes('right')) {
+      const direction = resize.edge.includes('right') ? 1 : -1;
+      changes.questionWidthScale = clamp(resize.startWidthScale * (1 + direction * dx / Math.max(1, resize.width)), .25, 5);
+      changes.questionX = clamp(resize.questionX + dx / (resize.canvasWidth * .55) * 50, -50, 50);
+    }
+    if (resize.edge.includes('top') || resize.edge.includes('bottom')) {
+      const direction = resize.edge.includes('bottom') ? 1 : -1;
+      changes.questionHeightScale = clamp(resize.startHeightScale * (1 + direction * dy / Math.max(1, resize.height)), .25, 5);
+      changes.questionY = clamp(resize.questionY + dy / (resize.canvasHeight * .55) * 50, -50, 50);
+    }
+    setQuestionLayout(changes);
   };
   const finishQuestionResize = (event) => {
     if (questionResizeRef.current?.pointerId === event.pointerId) questionResizeRef.current = null;
@@ -1027,7 +1047,7 @@ function Studio({ onClose, onSaved, initial }) {
   };
 
   const questionRect = page.background && backgroundAsset?.questionImage && canvasRef.current
-    ? getQuestionImageRect(backgroundAsset.questionImage, canvasRef.current.clientWidth, canvasRef.current.clientHeight, format, page.questionScale, page.questionX, page.questionY)
+    ? getQuestionImageRect(backgroundAsset.questionImage, canvasRef.current.clientWidth, canvasRef.current.clientHeight, format, page.questionScale, page.questionX, page.questionY, page.questionWidthScale, page.questionHeightScale)
     : null;
   const cameraStyle = { left: `${cameraLayout.x}%`, top: `${cameraLayout.y}%`, width: `${cameraLayout.width}%`, height: `${cameraLayout.height}%` };
 
@@ -1092,7 +1112,7 @@ function Studio({ onClose, onSaved, initial }) {
             <button className={tool === 'move-image' ? styles.activeTool : ''} title="Görseli tahta üzerinde sürükleyin" onClick={() => setTool('move-image')}><Move size={18} /><span>Görseli Taşı</span></button>
             <button title="Görseli ortala" onClick={() => setQuestionLayout({ questionX: 0, questionY: 0 })}><MousePointer2 size={18} /><span>Ortala</span></button>
           </div>
-          <div className={styles.imageMoveNote}><Move size={14} /> Görseli kutusundan tutup taşıyın; mavi köşelerden çekip boyutlandırın.</div>
+          <div className={styles.imageMoveNote}><Move size={14} /> Görseli kutusundan taşıyın; mavi kenar veya köşelerden çekip boyutlandırın.</div>
           <div className={styles.rangeLabel}><p>Soru Boyutu</p><span>{Math.round((page.questionScale || 1.25) * 100)}%</span></div>
           <input className={styles.sizeRange} aria-label="Soru görseli boyutu" type="range" min="25" max="500" step="5" value={Math.round((page.questionScale || 1.25) * 100)} onChange={(e) => setQuestionScale(Number(e.target.value) / 100)} />
           <div className={styles.actionGrid}>
@@ -1109,7 +1129,7 @@ function Studio({ onClose, onSaved, initial }) {
         <div className={`${styles.canvasShell} ${styles['format' + format.replace(':', '')]} ${isRecording ? styles.recordingShell : ''}`}>
           <canvas className={cropMode ? styles.cropCursor : tool === 'move-image' ? styles.moveCursor : ''} ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
           {tool === 'move-image' && questionRect && <div className={styles.questionSelection} style={{ left: questionRect.x, top: questionRect.y, width: questionRect.width, height: questionRect.height }} onPointerDown={startQuestionMove} onPointerMove={moveQuestion} onPointerUp={finishQuestionMove} onPointerCancel={finishQuestionMove}>
-            {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((corner) => <button key={corner} aria-label={`Görseli ${corner} köşesinden boyutlandır`} className={`${styles.resizeHandle} ${styles[corner.replace('-', '')]}`} onPointerDown={(event) => startQuestionResize(event, corner)} onPointerMove={resizeQuestion} onPointerUp={finishQuestionResize} onPointerCancel={finishQuestionResize} />)}
+            {['top', 'right', 'bottom', 'left', 'top-left', 'top-right', 'bottom-left', 'bottom-right'].map((edge) => <button key={edge} aria-label={`Görseli ${edge} yönünden boyutlandır`} className={`${styles.resizeHandle} ${styles[`question${edge.replace('-', '')}`]}`} onPointerDown={(event) => startQuestionResize(event, edge)} onPointerMove={resizeQuestion} onPointerUp={finishQuestionResize} onPointerCancel={finishQuestionResize} />)}
           </div>}
           {cropMode && cropSelection && <div className={styles.cropSelection} style={{ left: Math.min(cropSelection.start.x, cropSelection.end.x), top: Math.min(cropSelection.start.y, cropSelection.end.y), width: Math.abs(cropSelection.end.x - cropSelection.start.x), height: Math.abs(cropSelection.end.y - cropSelection.start.y) }} />}
           <div style={cameraStyle} className={`${styles.cameraBox} ${cameraOn ? '' : styles.hidden}`} onPointerDown={(event) => startCameraTransform(event, 'move')} onPointerMove={transformCamera} onPointerUp={finishCameraTransform} onPointerCancel={finishCameraTransform}>
@@ -1132,6 +1152,7 @@ export default function VisionManager() {
   const [contents, setContents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [studio, setStudio] = useState(null);
+  const [previewContent, setPreviewContent] = useState(null);
   const load = useCallback(async () => {
     setLoading(true);
     try { const response = await fetch('/api/vision'); const result = await response.json(); if (!response.ok) throw new Error(result.error); setContents(result.contents); }
@@ -1152,7 +1173,14 @@ export default function VisionManager() {
     <div className={styles.hero}><div><span className={styles.eyebrow}>Yalnızca yönetici erişimi</span><h2>Merkür Vizyon</h2><p>Dijital tahtada ders içeriği hazırlayın, kaydedin ve yönetin.</p></div><button className={styles.primaryButton} onClick={() => setStudio({})}><Plus size={19} /> Yeni içerik hazırla</button></div>
     <div className={styles.listPanel}>
       <div className={styles.listHeader}><h3>Kayıtlı içerikler</h3><span>{contents.length} içerik</span></div>
-      {loading ? <p className={styles.empty}>Yükleniyor…</p> : contents.length === 0 ? <p className={styles.empty}>Henüz kayıtlı içerik yok. İlk içeriğinizi hazırlayabilirsiniz.</p> : <div className={styles.grid}>{contents.map((item) => <article key={item.id} className={styles.card}><div className={styles.cardIcon}>{item.videoUrl ? <Video size={24} /> : <Play size={24} />}</div><div><h4>{item.title}</h4><p>{item.format} · {item.videoUrl ? 'Kamera videosu var · ' : ''}{new Date(item.updatedAt).toLocaleString('tr-TR')}</p><span className={item.status === 'PUBLISHED' ? styles.published : styles.draft}>{item.status === 'PUBLISHED' ? 'Yayımlandı' : 'Taslak'}</span></div><div className={styles.cardActions}>{item.videoUrl && <a className={styles.downloadLink} href={`/api/vision/${item.id}/video`}><Download size={16} /></a>}<button onClick={() => openExisting(item.id)}>Aç</button><button className={styles.deleteButton} onClick={() => remove(item.id, item.title)}><Trash2 size={16} /></button></div></article>)}</div>}
+      {loading ? <p className={styles.empty}>Yükleniyor…</p> : contents.length === 0 ? <p className={styles.empty}>Henüz kayıtlı içerik yok. İlk içeriğinizi hazırlayabilirsiniz.</p> : <div className={styles.grid}>{contents.map((item) => <article key={item.id} className={styles.card}><div className={styles.cardIcon}>{item.videoUrl ? <Video size={24} /> : <Play size={24} />}</div><div><h4>{item.title}</h4><p>{item.format} · {item.videoUrl ? 'Kamera videosu var · ' : ''}{new Date(item.updatedAt).toLocaleString('tr-TR')}</p><span className={item.status === 'PUBLISHED' ? styles.published : styles.draft}>{item.status === 'PUBLISHED' ? 'Yayımlandı' : 'Taslak'}</span></div><div className={styles.cardActions}>{item.videoUrl && <a className={styles.downloadLink} href={`/api/vision/${item.id}/video`} title="Videoyu indir"><Download size={16} /></a>}{item.videoUrl ? <button onClick={() => setPreviewContent(item)}><Play size={15} /> Aç</button> : <button onClick={() => openExisting(item.id)}>Aç</button>}{item.videoUrl && <button onClick={() => openExisting(item.id)}>Düzenle</button>}<button className={styles.deleteButton} onClick={() => remove(item.id, item.title)}><Trash2 size={16} /></button></div></article>)}</div>}
     </div>
+    {previewContent && <div className={styles.videoModalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewContent(null); }}>
+      <div className={styles.videoModal} role="dialog" aria-modal="true" aria-label={`${previewContent.title} video önizlemesi`}>
+        <div className={styles.videoModalHeader}><div><span>Video Önizleme</span><h3>{previewContent.title}</h3></div><button onClick={() => setPreviewContent(null)} aria-label="Video önizlemesini kapat">×</button></div>
+        <video key={previewContent.id} controls autoPlay playsInline preload="metadata" src={`/api/vision/${previewContent.id}/video?inline=1`} />
+        <div className={styles.videoModalFooter}><a href={`/api/vision/${previewContent.id}/video`}><Download size={16} /> Videoyu indir</a><button onClick={() => { const id = previewContent.id; setPreviewContent(null); openExisting(id); }}>Düzenle</button></div>
+      </div>
+    </div>}
   </section>;
 }
