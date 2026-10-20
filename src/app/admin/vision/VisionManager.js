@@ -23,6 +23,14 @@ const CAMERA_BACKGROUNDS = [
   { id: 'background-1', label: 'Fon 1', source: '/vision/camera-backgrounds/1.jpeg' },
   { id: 'background-2', label: 'Fon 2', source: '/vision/camera-backgrounds/2.jpeg' }
 ];
+const CAMERA_CONSTRAINTS = {
+  width: { ideal: 1280, max: 1280 },
+  height: { ideal: 720, max: 720 },
+  frameRate: { ideal: 24, max: 24 },
+  facingMode: 'user'
+};
+const SEGMENTATION_FRAME_INTERVAL = 1000 / 12;
+const RECORDING_FRAME_INTERVAL = 1000 / 24;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const emptyPage = (number = 1) => ({ id: crypto.randomUUID(), title: `Sayfa ${number}`, actions: [], background: null });
 const TOOL_GROUPS = [
@@ -327,6 +335,7 @@ function Studio({ onClose, onSaved, initial }) {
     }
     let cancelled = false;
     let processing = false;
+    let lastProcessedAt = 0;
     cameraCompositeReadyRef.current = false;
     setCameraBackgroundBusy(true);
     const backgroundImage = new Image();
@@ -347,11 +356,15 @@ function Studio({ onClose, onSaved, initial }) {
           const output = cameraCompositeRef.current;
           const video = cameraRef.current;
           if (!output || !video?.videoWidth || !results.segmentationMask) return;
-          output.width = video.videoWidth;
-          output.height = video.videoHeight;
-          // Work at a higher mask resolution so the cutout follows hair and
-          // shoulders closely instead of producing a wide, soft halo.
-          const maskWidth = Math.min(512, video.videoWidth);
+          const previewWidth = Math.min(640, video.videoWidth);
+          const previewHeight = Math.max(1, Math.round(previewWidth * video.videoHeight / video.videoWidth));
+          if (output.width !== previewWidth || output.height !== previewHeight) {
+            output.width = previewWidth;
+            output.height = previewHeight;
+          }
+          // 256px is enough for the small camera tile and cuts the expensive
+          // per-pixel mask work to roughly a quarter of the previous load.
+          const maskWidth = Math.min(256, video.videoWidth);
           const maskHeight = Math.max(1, Math.round(maskWidth * video.videoHeight / video.videoWidth));
           if (refinedMask.width !== maskWidth || refinedMask.height !== maskHeight) {
             refinedMask.width = maskWidth;
@@ -414,10 +427,11 @@ function Studio({ onClose, onSaved, initial }) {
           setCameraBackgroundBusy(false);
         });
         cameraSegmentationRef.current = segmenter;
-        const processFrame = async () => {
+        const processFrame = async (timestamp = 0) => {
           if (cancelled) return;
           const video = cameraRef.current;
-          if (!processing && video?.readyState >= 2) {
+          if (!processing && video?.readyState >= 2 && timestamp - lastProcessedAt >= SEGMENTATION_FRAME_INTERVAL) {
+            lastProcessedAt = timestamp;
             processing = true;
             try { await segmenter.send({ image: video }); } catch (error) { console.error('Camera background processing failed:', error); }
             processing = false;
@@ -731,7 +745,7 @@ function Studio({ onClose, onSaved, initial }) {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, facingMode: 'user' },
+        video: CAMERA_CONSTRAINTS,
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
       });
       streamRef.current = stream; cameraRef.current.srcObject = stream; setCameraOn(true);
@@ -848,17 +862,19 @@ function Studio({ onClose, onSaved, initial }) {
       recordingOutputStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
       const sessionId = recordingSessionRef.current + 1;
       recordingSessionRef.current = sessionId;
-      const dimensions = format === '9:16' ? [1080, 1920] : format === '1:1' ? [1440, 1440] : [1920, 1080];
+      const dimensions = format === '9:16' ? [720, 1280] : format === '1:1' ? [960, 960] : [1280, 720];
       const output = document.createElement('canvas'); output.width = dimensions[0]; output.height = dimensions[1];
-      const composedStream = output.captureStream(30);
+      const composedStream = output.captureStream(24);
       cameraStream.getAudioTracks().filter((track) => track.readyState === 'live').forEach((track) => composedStream.addTrack(track));
       recordingOutputStreamRef.current = composedStream;
-      const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((type) => MediaRecorder.isTypeSupported(type));
+      // VP8 is noticeably lighter to encode on mid-range systems; keep VP9
+      // as a fallback for browsers that do not expose VP8 recording.
+      const mimeType = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'].find((type) => MediaRecorder.isTypeSupported(type));
       if (!mimeType) throw new Error('Tarayıcınızda desteklenen video kodlayıcı bulunamadı.');
       const recorder = new MediaRecorder(composedStream, {
         mimeType,
-        videoBitsPerSecond: format === '9:16' ? 8000000 : 6500000,
-        audioBitsPerSecond: 128000
+        videoBitsPerSecond: format === '9:16' ? 4200000 : 3600000,
+        audioBitsPerSecond: 96000
       });
       const chunks = [];
       const finish = () => {
@@ -882,9 +898,13 @@ function Studio({ onClose, onSaved, initial }) {
         setRecordedBlob(new Blob(chunks, { type: mimeType }));
         toast.success('Yeni kamera ve tahta kaydı hazır. Tekrar kayıt alabilir veya videoyu kaydedebilirsiniz.');
       };
-      const frame = () => {
+      let lastRecordedFrameAt = 0;
+      const frame = (timestamp = 0) => {
         if (recordingSessionRef.current !== sessionId || recorder.state === 'inactive') return;
-        (drawCompositeFrameRef.current || drawCompositeFrame)(output, canvasRef.current, cameraRef.current);
+        if (timestamp - lastRecordedFrameAt >= RECORDING_FRAME_INTERVAL) {
+          lastRecordedFrameAt = timestamp;
+          (drawCompositeFrameRef.current || drawCompositeFrame)(output, canvasRef.current, cameraRef.current);
+        }
         recordingFrameRef.current = requestAnimationFrame(frame);
       };
       recorderRef.current = recorder;
@@ -1016,15 +1036,15 @@ function Studio({ onClose, onSaved, initial }) {
       <button className={styles.iconButton} onClick={onClose} title="Geri"><ArrowLeft size={16} /></button>
       <input className={styles.titleInput} value={title} maxLength={180} onChange={(e) => setTitle(e.target.value)} />
       <select value={format} onChange={(e) => { const nextFormat = e.target.value; setFormat(nextFormat); if (DEFAULT_BACKGROUNDS[nextFormat] && color === '#111827') setColor('#ffffff'); else if (!DEFAULT_BACKGROUNDS[nextFormat] && color === '#ffffff') setColor('#111827'); }}><option value="fullscreen">Serbest</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option></select>
-      <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`}><ImagePlus size={15} /> {documentLoading ? 'Yükleniyor…' : 'Görsel / PDF'}<input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
-      {page?.background && <button className={`${styles.headerButton} ${cropMode ? styles.cropActive : ''}`} onClick={() => { setCropMode((value) => !value); setCropSelection(null); cropSelectionRef.current = null; }} title="Tahta üzerinde kırpılacak alanı sürükleyerek seçin"><Crop size={15} /> {cropMode ? 'Kırp İptal' : 'Kırp'}</button>}
-      {!!page?.backgroundHistory?.length && <button className={styles.headerButton} onClick={undoCrop} title="Son kırpmayı geri al"><RotateCcw size={15} /> Geri Al</button>}
-      <button className={styles.headerButton} onClick={toggleCamera}>{cameraOn ? <VideoOff size={15} /> : <Video size={15} />} Kamera</button>
-      <button disabled={isFinalizingRecording} title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={15} /> {isFinalizingRecording ? 'Hazırlanıyor…' : isRecording ? 'Kaydı Bitir' : recordedBlob ? 'Yeni Kayıt' : 'Kayıt'}</button>
-      {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo} title="Videoyu indir"><Download size={15} /> Video</button>}
-      <button className={styles.headerButton} onClick={downloadImage} title="PNG indir"><Download size={15} /> PNG</button>
-      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')} title="Taslak olarak kaydet"><Save size={15} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</button>
-      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')} title="Kaydet ve yayımla"><Save size={15} /> {saving && uploadProgress ? `%${uploadProgress}` : 'Yayımla'}</button>
+      <label className={`${styles.headerButton} ${documentLoading ? styles.disabledButton : ''}`} title="Görsel veya PDF ekle"><ImagePlus size={14} /><span>{documentLoading ? 'Yükleniyor…' : 'Görsel / PDF'}</span><input disabled={documentLoading} hidden type="file" accept="image/*,.pdf,application/pdf" onChange={handleDocumentUpload} /></label>
+      {page?.background && <button className={`${styles.headerButton} ${cropMode ? styles.cropActive : ''}`} onClick={() => { setCropMode((value) => !value); setCropSelection(null); cropSelectionRef.current = null; }} title="Tahta üzerinde kırpılacak alanı sürükleyerek seçin"><Crop size={14} /><span>{cropMode ? 'Kırp İptal' : 'Kırp'}</span></button>}
+      {!!page?.backgroundHistory?.length && <button className={styles.headerButton} onClick={undoCrop} title="Son kırpmayı geri al"><RotateCcw size={14} /><span>Geri Al</span></button>}
+      <button className={styles.headerButton} onClick={toggleCamera} title={cameraOn ? 'Kamerayı kapat' : 'Kamerayı aç'}>{cameraOn ? <VideoOff size={14} /> : <Video size={14} />}<span>Kamera</span></button>
+      <button disabled={isFinalizingRecording} title="Tahta, kamera ve yalnızca mikrofon sesini kaydeder" className={isRecording ? styles.recordingButton : styles.headerButton} onClick={isRecording ? stopRecording : startRecording}><Video size={14} /><span>{isFinalizingRecording ? 'Hazırlanıyor…' : isRecording ? 'Kaydı Bitir' : recordedBlob ? 'Yeni Kayıt' : 'Kayıt'}</span></button>
+      {(recordedBlob || videoUrl) && <button className={styles.headerButton} onClick={downloadVideo} title="Videoyu indir"><Download size={14} /><span>Video</span></button>}
+      <button className={styles.headerButton} onClick={downloadImage} title="PNG indir"><Download size={14} /><span>PNG</span></button>
+      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.headerButton} onClick={() => save('DRAFT')} title="Taslak olarak kaydet"><Save size={14} /><span>{saving && uploadProgress ? `%${uploadProgress}` : 'Taslak'}</span></button>
+      <button disabled={saving || isRecording || isFinalizingRecording || !title.trim()} className={styles.primaryButton} onClick={() => save('PUBLISHED')} title="Kaydet ve yayımla"><Save size={14} /><span>{saving && uploadProgress ? `%${uploadProgress}` : 'Yayımla'}</span></button>
     </div>
     <div className={styles.workspace}>
       <aside className={styles.toolbar}>
