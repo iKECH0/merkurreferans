@@ -27,6 +27,13 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
+
+# Android signing material (never commit private keys)
+mobile/*.keystore
+mobile/*.jks
+mobile/android/app/*.keystore
+mobile/android/app/*.jks
 
 # vercel
 .vercel

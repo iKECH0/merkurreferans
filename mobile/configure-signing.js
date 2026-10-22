@@ -7,11 +7,12 @@ const keystoreSrc = path.join(__dirname, 'upload.keystore');
 const keystoreDest = path.join(appDir, 'upload.keystore');
 
 // 1. Copy upload.keystore directly into android/app/
-if (fs.existsSync(keystoreSrc)) {
+if (process.env.ANDROID_KEYSTORE_PASSWORD && process.env.ANDROID_KEY_ALIAS && process.env.ANDROID_KEY_PASSWORD && fs.existsSync(keystoreSrc)) {
   fs.copyFileSync(keystoreSrc, keystoreDest);
   console.log('✅ upload.keystore copied directly into android/app/upload.keystore');
 } else {
-  console.error('❌ upload.keystore not found at', keystoreSrc);
+  console.error('❌ Signing setup skipped. Provide ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD locally.');
+  process.exitCode = 1;
 }
 
 if (!fs.existsSync(gradlePath)) {
@@ -25,9 +26,9 @@ let content = fs.readFileSync(gradlePath, 'utf8');
 const releaseSigningBlock = `
         release {
             storeFile file('upload.keystore')
-            storePassword 'merkuryorunge'
-            keyAlias 'upload'
-            keyPassword 'merkuryorunge'
+            storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            keyAlias System.getenv('ANDROID_KEY_ALIAS')
+            keyPassword System.getenv('ANDROID_KEY_PASSWORD')
         }
 `;
 

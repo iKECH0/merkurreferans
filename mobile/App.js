@@ -17,6 +17,7 @@ import { WebView } from 'react-native-webview';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
 const TARGET_URL = 'https://www.merkurreferans.com.tr';
+const TRUSTED_ORIGINS = new Set(['https://www.merkurreferans.com.tr', 'https://merkurreferans.com.tr']);
 
 export default function App() {
   const webViewRef = useRef(null);
@@ -76,7 +77,21 @@ export default function App() {
       return false;
     }
 
-    return true;
+    // Keep authenticated web content inside the HTTPS production origin.
+    // External links are opened by the device instead of becoming an
+    // unrestricted in-app browser.
+    try {
+      const parsed = new URL(url);
+      if (TRUSTED_ORIGINS.has(parsed.origin)) return true;
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        Linking.openURL(url).catch((err) => console.log('Harici bağlantı açılamadı:', err));
+        return false;
+      }
+    } catch {
+      return false;
+    }
+
+    return false;
   };
 
   return (
@@ -117,17 +132,17 @@ export default function App() {
               ref={webViewRef}
               source={{ uri: TARGET_URL }}
               style={styles.webView}
-              originWhitelist={['*']}
+              originWhitelist={['https://www.merkurreferans.com.tr', 'https://merkurreferans.com.tr']}
               javaScriptEnabled={true}
               domStorageEnabled={true}
               sharedCookiesEnabled={true}
-              thirdPartyCookiesEnabled={true}
+              thirdPartyCookiesEnabled={false}
               allowsInlineMediaPlayback={true}
               mediaPlaybackRequiresUserAction={false}
               startInLoadingState={false}
               pullToRefreshEnabled={true}
               bounces={true}
-              mixedContentMode="compatibility"
+              mixedContentMode="never"
               textZoom={100}
               setSupportMultipleWindows={false}
               onNavigationStateChange={(navState) => {
