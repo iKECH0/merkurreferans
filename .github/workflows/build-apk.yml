@@ -26,6 +26,8 @@ jobs:
 
       - name: 📱 Android SDK Kurulumu
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: 🟢 Node.js 20 Kurulumu
         uses: actions/setup-node@v4
