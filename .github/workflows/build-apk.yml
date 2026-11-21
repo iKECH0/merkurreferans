@@ -40,9 +40,15 @@ jobs:
           npm ci || npm install
 
       - name: ⚙️ Expo Prebuild & İmzalama Yapılandırması
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd mobile
           npx expo prebuild --platform android --clean
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > upload.keystore
           node configure-signing.js
           mkdir -p android/app
           cp upload.keystore android/app/upload.keystore
@@ -51,15 +57,19 @@ jobs:
           grep -E "targetSdk" android/build.gradle || true
 
       - name: 🔨 Google Play için AAB Derle (bundleRelease)
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd mobile/android
           chmod +x gradlew
           ./gradlew bundleRelease --stacktrace \
             -Pandroid.targetSdkVersion=36 \
             -Pandroid.injected.signing.store.file=$(pwd)/app/upload.keystore \
-            -Pandroid.injected.signing.store.password=merkuryorunge \
-            -Pandroid.injected.signing.key.alias=upload \
-            -Pandroid.injected.signing.key.password=merkuryorunge
+            -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
 
       - name: 🔨 Doğrudan Yükleme için APK Derle
         run: |
