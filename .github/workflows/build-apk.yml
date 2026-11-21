@@ -67,6 +67,7 @@ jobs:
           cd mobile/android
           chmod +x gradlew
           ./gradlew bundleRelease --stacktrace \
+            -Pandroid.minSdkVersion=24 \
             -Pandroid.targetSdkVersion=36 \
             -Pandroid.injected.signing.store.file=$(pwd)/app/upload.keystore \
             -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
@@ -77,6 +78,7 @@ jobs:
         run: |
           cd mobile/android
           ./gradlew assembleRelease --stacktrace \
+            -Pandroid.minSdkVersion=24 \
             -Pandroid.targetSdkVersion=36 \
             -Pandroid.injected.signing.store.file=$(pwd)/app/upload.keystore \
             -Pandroid.injected.signing.store.password=merkuryorunge \
