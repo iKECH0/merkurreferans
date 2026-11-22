@@ -52,6 +52,8 @@ jobs:
           npx expo prebuild --platform android --clean
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > upload.keystore
           node configure-signing.js
+          # Expo can regenerate the Gradle defaults; enforce the Play version immediately before build.
+          sed -E -i 's/versionCode[[:space:]]+[0-9]+/versionCode 10/; s/versionName[[:space:]]+"[^"]+"/versionName "1.0.7"/' android/app/build.gradle
           mkdir -p android/app
           cp upload.keystore android/app/upload.keystore
           echo "=== Yapılandırma Kontrolü ==="
