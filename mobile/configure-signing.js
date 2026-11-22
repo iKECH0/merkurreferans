@@ -49,13 +49,13 @@ if (!content.includes('signingConfig signingConfigs.release')) {
   );
 }
 
-// 4. Force targetSdkVersion 36, versionCode 10, versionName "1.0.7"
+// 4. Force targetSdkVersion 36, versionCode 11, versionName "1.0.8"
 content = content.replace(/targetSdkVersion\s+.*$/m, 'targetSdkVersion 36');
-content = content.replace(/versionCode\s+.*$/m, 'versionCode 10');
-content = content.replace(/versionName\s+.*$/m, 'versionName "1.0.7"');
+content = content.replace(/versionCode\s+.*$/m, 'versionCode 11');
+content = content.replace(/versionName\s+.*$/m, 'versionName "1.0.8"');
 
 fs.writeFileSync(gradlePath, content, 'utf8');
-console.log('✅ Release signing, targetSdkVersion 36 and versionCode 10 configured successfully in app/build.gradle');
+console.log('✅ Release signing, targetSdkVersion 36 and versionCode 11 configured successfully in app/build.gradle');
 
 // 5. Also update root android/build.gradle
 const rootGradlePath = path.join(__dirname, 'android', 'build.gradle');
