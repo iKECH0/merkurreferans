@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { registerStudent } from "./actions";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import "../login/login.css";
@@ -185,7 +184,18 @@ export default function RegisterPage() {
               <p style={{ color: 'var(--text-muted)' }}>Sayfa yükleniyor...</p>
             </div>
           }>
-            <RegisterForm />
+            <div className="login-box glass-panel tilt-effect" style={{ width: '100%', textAlign: 'center' }}>
+              <div className="login-header">
+                <h2>Kurum hesabınızla giriş yapın</h2>
+                <p>Merkür Referans, eğitim kurumunuzun tanımladığı öğrenci hesabıyla kullanılır.</p>
+              </div>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, padding: '1rem 0' }}>
+                Hesabınız kurumunuz tarafından oluşturulur. Giriş bilgileriniz yoksa okulunuz veya eğitim kurumunuzla iletişime geçin.
+              </p>
+              <Link href="/login" className="pulse-btn login-btn" style={{ display: 'block', width: '100%', marginTop: '1rem', textDecoration: 'none' }}>
+                Kurum hesabıyla giriş yap
+              </Link>
+            </div>
           </Suspense>
         </div>
       </div>

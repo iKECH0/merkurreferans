@@ -14,6 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.merkurreferans.app",
+      "buildNumber": "7",
       "infoPlist": {
         "NSCameraUsageDescription": "Canlı ders ve profil işlemleri için kamera izni gereklidir.",
         "NSMicrophoneUsageDescription": "Canlı ders sesli katılım için mikrofon izni gereklidir."

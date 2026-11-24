@@ -33,15 +33,15 @@ export default function ReferansLandingPage() {
         </h1>
         
         <p className="hero-desc-min">
-          Öğrenci ağınızı kurun, canlı dersler verin, anında kazanın.
+          Eğitim kurumunuzun tanımladığı canlı derslere ve öğrenci içeriklerine güvenli erişim.
         </p>
 
-        <Link href="/register" className="hero-cta-min">
-          Hemen Başlayın <ArrowRight size={20} />
+        <Link href="/login" className="hero-cta-min">
+          Kurum hesabıyla giriş yapın <ArrowRight size={20} />
         </Link>
 
         <div className="hero-trust-min">
-          <span><CheckCircle2 size={16} color="#10b981" /> Anında Kurulum</span>
+          <span><CheckCircle2 size={16} color="#10b981" /> Kurum tanımlı erişim</span>
           <span><CheckCircle2 size={16} color="#10b981" /> KVKK Uyumlu</span>
         </div>
       </section>
@@ -58,7 +58,7 @@ export default function ReferansLandingPage() {
         </div>
         <div className="stat-item-min">
           <h3>⚡</h3>
-          <span>Anında Ödeme</span>
+          <span>Güvenli erişim</span>
         </div>
       </section>
 
@@ -75,7 +75,7 @@ export default function ReferansLandingPage() {
         </div>
 
         <div className="feature-chips-min">
-          <span className="chip-min">💰 Şeffaf Cüzdan</span>
+          <span className="chip-min">🔐 Kurum kontrollü erişim</span>
           <span className="chip-min">📊 İstatistikler</span>
           <span className="chip-min">📱 Mobil Uygulama</span>
         </div>
@@ -97,8 +97,8 @@ export default function ReferansLandingPage() {
       <section className="footer-cta-min">
         <h2>Başlamaya hazır mısınız?</h2>
         
-        <Link href="/register" className="hero-cta-min" style={{ marginBottom: 0 }}>
-          Ücretsiz Kayıt Ol <ArrowRight size={20} />
+        <Link href="/login" className="hero-cta-min" style={{ marginBottom: 0 }}>
+          Kurum hesabıyla giriş yapın <ArrowRight size={20} />
         </Link>
 
         <div className="footer-links-min">
