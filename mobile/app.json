@@ -3,6 +3,11 @@
     "name": "Merkür Referans",
     "slug": "merkur-referans",
     "owner": "ikech",
+    "extra": {
+      "eas": {
+        "projectId": "fa31e56e-236c-41ad-86d4-57e9b043acc6"
+      }
+    },
     "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
