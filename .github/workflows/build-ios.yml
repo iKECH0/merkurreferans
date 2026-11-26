@@ -25,4 +25,5 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
+          npx eas-cli@latest init --account ikech --non-interactive
           npx eas-cli@latest build --platform ios --profile production --non-interactive --auto-submit

@@ -2,6 +2,7 @@
   "expo": {
     "name": "Merkür Referans",
     "slug": "merkur-referans",
+    "owner": "ikech",
     "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
