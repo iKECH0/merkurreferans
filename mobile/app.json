@@ -17,6 +17,7 @@
       "bundleIdentifier": "com.merkurreferans.app",
       "buildNumber": "7",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Canlı ders ve profil işlemleri için kamera izni gereklidir.",
         "NSMicrophoneUsageDescription": "Canlı ders sesli katılım için mikrofon izni gereklidir."
       }
